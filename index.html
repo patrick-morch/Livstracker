@@ -316,7 +316,10 @@
       renderAll();
     }
 
-    boot().then(ensureDemo);
+    window.addEventListener('load', () => {
+  boot().then(ensureDemo);
+});
+
 
     /* ---- Firestore Rules (sørg for at disse er publisert) ----
     rules_version = '2';
