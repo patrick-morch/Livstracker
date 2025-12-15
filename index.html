@@ -71,16 +71,15 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none" />
 
   <script>
+    // ==== Firebase: dine nøkler (redirect-login krever bare disse) ====
     const FIREBASE_CONFIG = {
-       // ==== Firebase: fyll inn for fler-enhets-synk ====
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB69tSMNhYoodHFPcb14350gwtfjvTqU",
-  authDomain: "habit-tracker-e0f50.firebaseapp.com",
-  projectId: "habit-tracker-e0f50",
-  appId: "1:631163589300:web:4d0ceac0a7085d1420bde1",
-  storageBucket: "habit-tracker-e0f50.firebasestorage.app",
-  messagingSenderId: "631163589300",
-  measurementId: "G-5BPHC4P8Q7"
+      apiKey: "AIzaSyB69tSMNhYoodHFPcb14350gwtfjvTqU",
+      authDomain: "habit-tracker-e0f50.firebaseapp.com",
+      projectId: "habit-tracker-e0f50",
+      appId: "1:631163589300:web:4d0ceac0a7085d1420bde1",
+      storageBucket: "habit-tracker-e0f50.firebasestorage.app",
+      messagingSenderId: "631163589300",
+      measurementId: "G-5BPHC4P8Q7"
     };
 
     // ==== Dato / utils ====
@@ -111,59 +110,58 @@ const FIREBASE_CONFIG = {
       fb.auth=firebase.auth();
       fb.db=firebase.firestore();
       fb.enabled=true;
-      try { await fb.db.enablePersistence({synchronizeTabs:true}); } catch(e) { /* ok å feile i noen miljøer */ }
+      try { await fb.db.enablePersistence({synchronizeTabs:true}); } catch(e) {}
     }
+
+    // ==== Auth: ren redirect (ingen popups) ====
     async function signIn(){
       if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-      try{
-        const provider=new firebase.auth.GoogleAuthProvider();
-        const res=await fb.auth.signInWithPopup(provider).catch(()=>fb.auth.signInAnonymously());
-        return res.user;
-      }catch(e){ alert('Innlogging feilet: '+e.message); }
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await fb.auth.signInWithRedirect(provider); // mindre feil, funker overalt
     }
     function signOut(){ if(fb.enabled && fb.auth.currentUser) fb.auth.signOut(); }
 
-    // ==== Synk: sky <-> lokal, inkl. førstegang-opplasting ====
+    // ==== Synk: sky <-> lokal (inkl. første-gangs opplasting) ====
     let unsubFields=null, unsubEntries=null, firstUploaded=false;
-    async function startSync(uid){
-      if(!firstUploaded){ const hasAny=await collectionHasAny(uid); if(!hasAny) await uploadAllLocal(uid); firstUploaded=true; }
-      unsubFields = fb.db.collection('users').doc(uid).collection('fields').onSnapshot(async snap=>{
-        const byId=new Map(); snap.forEach(d=>{const v=d.data(); byId.set(v.id,v);});
-        state.fields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
-        for(const f of state.fields) await idbSet('fields', f);
-        renderAll();
-      }, onFirestoreError);
-      unsubEntries = fb.db.collection('users').doc(uid).collection('entries').onSnapshot(async snap=>{
-        const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
-        state.entries=all;
-        for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
-        renderAll();
-      }, onFirestoreError);
-    }
     async function collectionHasAny(uid){
       const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
       const e=await fb.db.collection('users').doc(uid).collection('entries').limit(1).get();
       return !f.empty || !e.empty;
     }
     async function uploadAllLocal(uid){
-      // Viktig: pusher første enhets lokale data
       const batch=fb.db.batch(); const uref=fb.db.collection('users').doc(uid);
       state.fields.forEach(f=>batch.set(uref.collection('fields').doc(f.id), {...f,updatedAt:Date.now()},{merge:true}));
       Object.entries(state.entries).forEach(([date,values])=>batch.set(uref.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true}));
-      await batch.commit().catch(onFirestoreError);
+      await batch.commit();
     }
-    function onFirestoreError(err){ console.error(err); alert('Firestore-feil: '+(err?.message||err)); }
-
+    async function startSync(uid){
+      if(!firstUploaded){ const hasAny=await collectionHasAny(uid); if(!hasAny) await uploadAllLocal(uid); firstUploaded=true; }
+      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
+      unsubFields = fb.db.collection('users').doc(uid).collection('fields')
+        .onSnapshot(async snap=>{
+          const byId=new Map(); snap.forEach(d=>{const v=d.data(); byId.set(v.id,v);});
+          state.fields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
+          for(const f of state.fields) await idbSet('fields', f);
+          renderAll();
+        });
+      unsubEntries = fb.db.collection('users').doc(uid).collection('entries')
+        .onSnapshot(async snap=>{
+          const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
+          state.entries=all;
+          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+          renderAll();
+        });
+    }
     async function pushField(f){
       await idbSet('fields', f);
       if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id).set({...f,updatedAt:Date.now()},{merge:true}).catch(onFirestoreError);
+        await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id).set({...f,updatedAt:Date.now()},{merge:true});
       }
     }
     async function pushEntry(date, values){
       await idbSet('entries', {date,values,updatedAt:Date.now()});
       if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date).set({date,values,updatedAt:Date.now()},{merge:true}).catch(onFirestoreError);
+        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date).set({date,values,updatedAt:Date.now()},{merge:true});
       }
     }
 
@@ -197,11 +195,11 @@ const FIREBASE_CONFIG = {
       return (typeof field.goal==='number' && field.goal>10)?'y':'y1';
     }
 
-    // ==== Chart.js render ====
+    // ==== Chart.js ====
     let chart;
     function buildDatasets(dates, fields, matrix, smoothMode, showGoals){
       const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
-      const ds=[]; const seen=new Set(); // hindrer duplikat-serier
+      const ds=[]; const seen=new Set();
       fields.forEach((f,idx)=>{
         if(seen.has(f.id)) return; seen.add(f.id);
         const raw=dates.map(d=>(matrix[d]&&typeof matrix[d][f.id]!=='undefined')?Number(matrix[d][f.id]):null);
@@ -295,18 +293,18 @@ const FIREBASE_CONFIG = {
       await tryInitFirebase(); bindUI();
 
       if(fb.enabled){
-        firebase.auth().onAuthStateChanged(async (user)=>{
-          if(user){ state.uid=user.uid; syncStatus.textContent='Pålogget'; await startSync(user.uid); document.getElementById('btnLogout').style.display='inline-block'; document.getElementById('btnLogin').style.display='none'; }
-          else { state.uid=null; syncStatus.textContent='Ikke pålogget'; if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); document.getElementById('btnLogout').style.display='none'; document.getElementById('btnLogin').style.display='inline-block'; }
+        fb.auth.onAuthStateChanged(async (user)=>{
+          if(user){ state.uid=user.uid; syncStatus.textContent='Pålogget'; document.getElementById('btnLogout').style.display='inline-block'; document.getElementById('btnLogin').style.display='none'; await startSync(user.uid); }
+          else { state.uid=null; syncStatus.textContent='Ikke pålogget'; document.getElementById('btnLogout').style.display='none'; document.getElementById('btnLogin').style.display='inline-block'; if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); }
         });
       } else {
-        syncStatus.textContent='Kun lokal lagring (legg inn Firebase-nøkler for synk)';
+        syncStatus.textContent='Kun lokal lagring (legg inn Firebase-nøkler)';
       }
 
       renderAll();
     }
 
-    // Demo-data så grafen ikke er tom ved første visning
+    // Demo-data så grafen ikke er tom
     async function ensureDemo(){
       if(state.fields.length) return;
       await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left',updatedAt:Date.now()});
@@ -320,7 +318,7 @@ const FIREBASE_CONFIG = {
 
     boot().then(ensureDemo);
 
-    /* ---- Firestore Rules (lim inn i Firebase Console > Firestore > Rules) ----
+    /* ---- Firestore Rules (sørg for at disse er publisert) ----
     rules_version = '2';
     service cloud.firestore {
       match /databases/{db}/documents {
