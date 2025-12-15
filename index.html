@@ -1,336 +1,134 @@
-<!-- /index.html -->
 <!doctype html>
 <html lang="no">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Livstracker – Synk + Ryddige grafer</title>
-  <style>
-    :root { --bg:#0b0d10; --card:#11151a; --text:#e7e7e7; --muted:#9aa4af; --accent:#5aa7ff; }
-    *{box-sizing:border-box} body{margin:0;font:14px/1.45 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:14px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #1d232c;position:sticky;top:0;background:rgba(11,13,16,.9);backdrop-filter:blur(8px)}
-    h1{font-size:16px;margin:0}
-    .muted{color:var(--muted)} .small{font-size:12px}
-    .btn{padding:8px 12px;border:1px solid #263040;background:#151922;color:var(--text);border-radius:10px;cursor:pointer}
-    .btn.ghost{background:transparent}
-    .select{background:#0f131a;border:1px solid #263040;color:var(--text);padding:8px 10px;border-radius:10px}
-    main{padding:18px;display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
-    .card{background:var(--card);border:1px solid #1d232c;border-radius:16px;padding:14px}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    @media (max-width:960px){ main{grid-template-columns:repeat(6,1fr)} .span-12{grid-column:span 6} }
-    .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid #2a3342;cursor:pointer}
-  </style>
+  <title>Livstracker</title>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js" defer></script>
+
+  <style>
+    body{margin:0;font-family:system-ui;background:#0b0d10;color:#e7e7e7}
+    header{padding:12px 16px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #222}
+    button{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#151922;color:white;cursor:pointer}
+    main{padding:16px}
+  </style>
 </head>
+
 <body>
-  <header>
-    <h1>Livstracker</h1>
-    <span id="net" class="small muted"></span>
-    <span class="muted">·</span>
-    <span id="syncStatus" class="small muted">Ikke pålogget</span>
-    <div style="flex:1"></div>
-    <button id="btnImport" class="btn">Importer JSON</button>
-    <button id="btnExport" class="btn ghost">Eksporter JSON</button>
-    <button id="btnLogin" class="btn">Logg inn</button>
-    <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
-  </header>
+<header>
+  <strong>Livstracker</strong>
+  <span id="status">Ikke pålogget</span>
+  <div style="flex:1"></div>
+  <button id="login">Logg inn</button>
+  <button id="logout" style="display:none">Logg ut</button>
+</header>
 
-  <main>
-    <section class="card span-12" style="grid-column:span 12">
-      <div class="row">
-        <label>Periode <select id="period" class="select">
-          <option value="7d">Uke</option><option value="30d">Måned</option><option value="365d">År</option><option value="all">Alt</option>
-        </select></label>
-        <label>Gruppering <select id="grouping" class="select">
-          <option value="day">Dag</option><option value="week">Uke</option><option value="month">Måned</option>
-        </select></label>
-        <label>Agg <select id="agg" class="select"><option value="avg">Snitt</option><option value="sum">Sum</option></select></label>
-        <label>Glatting <select id="smooth" class="select">
-          <option value="none">Av</option><option value="ma7">7d</option><option value="ma28">28d</option>
-        </select></label>
-        <label>Akse <select id="axisMap" class="select">
-          <option value="auto">Auto</option><option value="manual">Manuell</option>
-        </select></label>
-        <label class="small" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="showGoals" /> Vis mål-linjer</label>
-        <div style="flex:1"></div>
-        <label>Felt <select id="fieldSelect" class="select" multiple size="1" style="min-width:220px"></select></label>
-      </div>
-    </section>
+<main>
+  <canvas id="chart" height="120"></canvas>
+</main>
 
-    <section class="card span-12" style="grid-column:span 12">
-      <canvas id="chart" height="120"></canvas>
-      <div id="legend" class="legend"></div>
-      <div class="small muted">Venstre: 0–100 · Høyre: 0–10</div>
-    </section>
-  </main>
+<script>
+/* ================== FIREBASE CONFIG ================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB69tSMNhYoodHFPcb14350gwtfjvTqU",
+  authDomain: "habit-tracker-e0f50.firebaseapp.com",
+  projectId: "habit-tracker-e0f50",
+  appId: "1:631163589300:web:4d0ceac0a7085d1420bde1"
+};
 
-  <input id="fileInput" type="file" accept="application/json" style="display:none" />
+/* ================== FIREBASE INIT ================== */
+let app, auth, db;
 
-  <script>
-    // ==== Firebase: dine nøkler (redirect-login krever bare disse) ====
-    const FIREBASE_CONFIG = {
-      apiKey: "AIzaSyB69tSMNhYoodHFPcb14350gwtfjvTqU",
-      authDomain: "habit-tracker-e0f50.firebaseapp.com",
-      projectId: "habit-tracker-e0f50",
-      appId: "1:631163589300:web:4d0ceac0a7085d1420bde1",
-      storageBucket: "habit-tracker-e0f50.firebasestorage.app",
-      messagingSenderId: "631163589300",
-      measurementId: "G-5BPHC4P8Q7"
-    };
+function waitForFirebase() {
+  return new Promise((res, rej) => {
+    const start = Date.now();
+    (function check() {
+      if (window.firebase && firebase.auth && firebase.firestore) return res();
+      if (Date.now() - start > 8000) return rej("Firebase SDK timeout");
+      setTimeout(check, 50);
+    })();
+  });
+}
 
-    // ==== Dato / utils ====
-    const todayISO = () => new Date().toISOString().slice(0,10);
-    const iso = d => new Date(d).toISOString().slice(0,10);
-    const addDays = (d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;};
+async function initFirebase() {
+  await waitForFirebase();
 
-    // ==== IndexedDB (local-first) ====
-    const DB_NAME='livstracker', DB_VERSION=1; let db;
-    function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result;
-        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
-        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
-      };
-      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
-    });}
-    const idbGetAll = (store)=>new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
-    const idbSet = (store,val)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
+  if (!firebase.apps.length) {
+    app = firebase.initializeApp(FIREBASE_CONFIG);
+  } else {
+    app = firebase.app();
+  }
 
-    // ==== App-state ====
-    let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[] };
+  auth = firebase.auth();
+  db = firebase.firestore();
 
-    // ==== Firebase init + persistence ====
-    let fb={enabled:false, app:null, auth:null, db:null};
-    async function tryInitFirebase(){
-      if(!FIREBASE_CONFIG.apiKey) return;
-      fb.app=firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth=firebase.auth();
-      fb.db=firebase.firestore();
-      fb.enabled=true;
-      try { await fb.db.enablePersistence({synchronizeTabs:true}); } catch(e) {}
+  try {
+    await db.enablePersistence({ synchronizeTabs: true });
+  } catch (_) {}
+}
+
+/* ================== AUTH ================== */
+async function login() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  await auth.signInWithRedirect(provider);
+}
+
+function logout() {
+  auth.signOut();
+}
+
+/* ================== UI ================== */
+const statusEl = document.getElementById("status");
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+
+loginBtn.onclick = login;
+logoutBtn.onclick = logout;
+
+/* ================== CHART (dummy) ================== */
+let chart;
+function renderChart() {
+  const ctx = document.getElementById("chart");
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: ["Man","Tir","Ons","Tor","Fre"],
+      datasets: [{
+        label: "Søvnscore",
+        data: [75,80,78,85,82],
+        borderColor: "#5aa7ff",
+        tension: 0.3
+      }]
+    },
+    options: { responsive:true }
+  });
+}
+
+/* ================== BOOT ================== */
+async function boot() {
+  await initFirebase();
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      statusEl.textContent = "Pålogget";
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      renderChart();
+    } else {
+      statusEl.textContent = "Ikke pålogget";
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
     }
+  });
+}
 
-    // ==== Auth: ren redirect (ingen popups) ====
-    async function signIn(){
-      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-      const provider = new firebase.auth.GoogleAuthProvider();
-      await fb.auth.signInWithRedirect(provider); // mindre feil, funker overalt
-    }
-    function signOut(){ if(fb.enabled && fb.auth.currentUser) fb.auth.signOut(); }
-
-    // ==== Synk: sky <-> lokal (inkl. første-gangs opplasting) ====
-    let unsubFields=null, unsubEntries=null, firstUploaded=false;
-    async function collectionHasAny(uid){
-      const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
-      const e=await fb.db.collection('users').doc(uid).collection('entries').limit(1).get();
-      return !f.empty || !e.empty;
-    }
-    async function uploadAllLocal(uid){
-      const batch=fb.db.batch(); const uref=fb.db.collection('users').doc(uid);
-      state.fields.forEach(f=>batch.set(uref.collection('fields').doc(f.id), {...f,updatedAt:Date.now()},{merge:true}));
-      Object.entries(state.entries).forEach(([date,values])=>batch.set(uref.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true}));
-      await batch.commit();
-    }
-    async function startSync(uid){
-      if(!firstUploaded){ const hasAny=await collectionHasAny(uid); if(!hasAny) await uploadAllLocal(uid); firstUploaded=true; }
-      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
-      unsubFields = fb.db.collection('users').doc(uid).collection('fields')
-        .onSnapshot(async snap=>{
-          const byId=new Map(); snap.forEach(d=>{const v=d.data(); byId.set(v.id,v);});
-          state.fields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
-          for(const f of state.fields) await idbSet('fields', f);
-          renderAll();
-        });
-      unsubEntries = fb.db.collection('users').doc(uid).collection('entries')
-        .onSnapshot(async snap=>{
-          const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
-          state.entries=all;
-          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
-          renderAll();
-        });
-    }
-    async function pushField(f){
-      await idbSet('fields', f);
-      if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id).set({...f,updatedAt:Date.now()},{merge:true});
-      }
-    }
-    async function pushEntry(date, values){
-      await idbSet('entries', {date,values,updatedAt:Date.now()});
-      if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date).set({date,values,updatedAt:Date.now()},{merge:true});
-      }
-    }
-
-    // ==== Import/Eksport ====
-    function exportJSON(){
-      const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});
-      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url);
-    }
-    async function importJSON(file){
-      const text=await file.text(); const data=JSON.parse(text);
-      const byId=new Map(state.fields.map(f=>[f.id,f])); (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()}));
-      state.fields=[...byId.values()];
-      for(const f of state.fields) await pushField(f);
-      for(const [d,vals] of Object.entries(data.entries||{})) await pushEntry(d, vals);
-      renderAll(); alert('Import fullført');
-    }
-
-    // ==== Graf-helpers ====
-    function dateRange(period){ if(period==='all')return null; const map={'7d':7,'30d':30,'365d':365}; return addDays(new Date(),-map[period]); }
-    function groupKey(d,mode){ const x=new Date(d);
-      if(mode==='week'){ const day=(x.getUTCDay()+6)%7; const monday=new Date(Date.UTC(x.getUTCFullYear(),x.getUTCMonth(),x.getUTCDate()-day)); return monday.toISOString().slice(0,10); }
-      if(mode==='month') return `${x.getUTCFullYear()}-${String(x.getUTCMonth()+1).padStart(2,'0')}-01`;
-      return iso(x);
-    }
-    function movingAvg(arr,win){ const out=[]; let sum=0,q=[]; for(const v of arr){ q.push(v??0); sum+=v??0; if(q.length>win) sum-=q.shift(); out.push(q.length===win?sum/win:null);} return out; }
-    function pickAxis(field){
-      if(state.axisMapMode==='manual' && field.axisHint) return field.axisHint==='left'?'y':'y1';
-      const n=(field.name||'').toLowerCase();
-      if(n.includes('score')||n.includes('%')) return 'y';
-      if(n.includes('time')||n.includes('timer')||n.includes('min')) return 'y1';
-      return (typeof field.goal==='number' && field.goal>10)?'y':'y1';
-    }
-
-    // ==== Chart.js ====
-    let chart;
-    function buildDatasets(dates, fields, matrix, smoothMode, showGoals){
-      const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
-      const ds=[]; const seen=new Set();
-      fields.forEach((f,idx)=>{
-        if(seen.has(f.id)) return; seen.add(f.id);
-        const raw=dates.map(d=>(matrix[d]&&typeof matrix[d][f.id]!=='undefined')?Number(matrix[d][f.id]):null);
-        const data=smoothMode==='ma7'?movingAvg(raw,7):smoothMode==='ma28'?movingAvg(raw,28):raw;
-        const axis=pickAxis(f);
-        ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[idx%colors.length],backgroundColor:colors[idx%colors.length]+'33',pointRadius:0,tension:.25});
-        if(showGoals && typeof f.goal==='number'){
-          ds.push({label:f.name+' mål',data:dates.map(()=>f.goal),yAxisID:axis,borderColor:colors[idx%colors.length],borderDash:[6,6],pointRadius:0,tension:0});
-        }
-      });
-      return ds;
-    }
-    function renderChart(){
-      const period=periodEl.value, grouping=groupingEl.value, agg=aggEl.value, smooth=smoothEl.value, showGoals=showGoalsEl.checked;
-      const since=dateRange(period);
-      const datesAll=Object.keys(state.entries).sort();
-      const dates=datesAll.filter(d=>!since || new Date(d)>=since);
-
-      const groups={};
-      for(const d of dates){
-        const g=groupKey(d,grouping); groups[g]??={};
-        const vals=state.entries[d]||{};
-        state.fields.forEach(f=>{ const v=vals[f.id]; if(typeof v==='undefined') return; (groups[g][f.id]??=[]).push(Number(v)); });
-      }
-      const labels=Object.keys(groups).sort();
-      const matrix={}; for(const g of labels){ matrix[g]={}; state.fields.forEach(f=>{ const arr=groups[g][f.id]||[]; matrix[g][f.id]=arr.length?(agg==='sum'?arr.reduce((a,b)=>a+b,0):arr.reduce((a,b)=>a+b,0)/arr.length):null; }); }
-
-      const selected = state.selectedFields.length ? new Set(state.selectedFields) : new Set(state.fields.map(f=>f.id));
-      const fields = state.fields.filter(f=>selected.has(f.id) && f.type==='number');
-
-      const datasets=buildDatasets(labels, fields, matrix, smooth, showGoals);
-      if(chart) chart.destroy();
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets},options:{
-        responsive:true,animation:false,interaction:{mode:'nearest',intersect:false},
-        plugins:{legend:{display:true,position:'bottom'}},
-        scales:{
-          y:{type:'linear',position:'left',min:0,max:100,grid:{color:'#1e2633'},ticks:{color:'#9aa4af'}},
-          y1:{type:'linear',position:'right',min:0,max:10, grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
-          x:{grid:{color:'#1e2633'},ticks:{color:'#9aa4af'}}
-        }
-      }});
-      legendEl.innerHTML='';
-      fields.forEach(f=>{
-        const chip=document.createElement('div'); chip.className='chip'; chip.textContent=f.name;
-        chip.onclick=()=>{ const i=chart.data.datasets.findIndex(d=>d.label===f.name); const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål'); if(i>=0) chart.toggleDataVisibility(i); if(gi>=0) chart.toggleDataVisibility(gi); chart.update(); };
-        legendEl.appendChild(chip);
-      });
-    }
-
-    // ==== UI-binding ====
-    const syncStatus=document.getElementById('syncStatus');
-    const netEl=document.getElementById('net');
-    const fieldSelect=document.getElementById('fieldSelect');
-    const periodEl=document.getElementById('period');
-    const groupingEl=document.getElementById('grouping');
-    const aggEl=document.getElementById('agg');
-    const smoothEl=document.getElementById('smooth');
-    const axisEl=document.getElementById('axisMap');
-    const showGoalsEl=document.getElementById('showGoals');
-    const chartCtx=document.getElementById('chart').getContext('2d');
-    const legendEl=document.getElementById('legend');
-
-    function renderFieldSelect(){
-      fieldSelect.innerHTML='';
-      const byId=new Map(state.fields.map(f=>[f.id,f])); // dedupe
-      [...byId.values()].filter(f=>f.type==='number').forEach(f=>{
-        const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name; fieldSelect.appendChild(opt);
-      });
-      for(const id of state.selectedFields){ const o=[...fieldSelect.options].find(o=>o.value===id); if(o) o.selected=true; }
-      fieldSelect.onchange=()=>{ state.selectedFields=[...fieldSelect.selectedOptions].map(o=>o.value); renderChart(); };
-    }
-    function renderAll(){ renderFieldSelect(); renderChart(); }
-
-    function bindUI(){
-      document.getElementById('btnExport').onclick=exportJSON;
-      document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
-      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(f) importJSON(f);};
-      [periodEl,groupingEl,aggEl,smoothEl].forEach(el=>el.onchange=renderChart);
-      axisEl.onchange=(e)=>{state.axisMapMode=e.target.value; renderChart();};
-      showGoalsEl.onchange=renderChart;
-      document.getElementById('btnLogin').onclick=signIn;
-      document.getElementById('btnLogout').onclick=signOut;
-      const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');}; window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
-    }
-
-    // ==== Boot ====
-    async function boot(){
-      await idbOpen();
-      const fieldsArr=await idbGetAll('fields'); const byId=new Map(fieldsArr.map(f=>[f.id,f])); state.fields=[...byId.values()];
-      const entriesArr=await idbGetAll('entries'); state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
-      await tryInitFirebase(); bindUI();
-
-      if(fb.enabled){
-        fb.auth.onAuthStateChanged(async (user)=>{
-          if(user){ state.uid=user.uid; syncStatus.textContent='Pålogget'; document.getElementById('btnLogout').style.display='inline-block'; document.getElementById('btnLogin').style.display='none'; await startSync(user.uid); }
-          else { state.uid=null; syncStatus.textContent='Ikke pålogget'; document.getElementById('btnLogout').style.display='none'; document.getElementById('btnLogin').style.display='inline-block'; if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); }
-        });
-      } else {
-        syncStatus.textContent='Kun lokal lagring (legg inn Firebase-nøkler)';
-      }
-
-      renderAll();
-    }
-
-    // Demo-data så grafen ikke er tom
-    async function ensureDemo(){
-      if(state.fields.length) return;
-      await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left',updatedAt:Date.now()});
-      await pushField({id:'sleep_hours',name:'Søvn timer',type:'number',goal:8, includeInProgress:true,axisHint:'right',updatedAt:Date.now()});
-      const base=todayISO();
-      for(let i=0;i<21;i++){const d=iso(addDays(base,-i));
-        await pushEntry(d,{sleep_score:Math.round(80+(Math.random()*20-10)),sleep_hours:Math.max(4,Math.min(10,Math.round(7+(Math.random()*4-2))))});
-      }
-      renderAll();
-    }
-
-    window.addEventListener('load', () => {
-  boot().then(ensureDemo);
-});
-
-
-    /* ---- Firestore Rules (sørg for at disse er publisert) ----
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{db}/documents {
-        match /users/{uid}/{col}/{doc} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
-        }
-      }
-    }
-    */
-  </script>
+window.addEventListener("load", boot);
+</script>
 </body>
 </html>
