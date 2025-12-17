@@ -46,24 +46,21 @@
     .item{display:flex;align-items:center;gap:10px;border:1px dashed var(--border);border-radius:10px;padding:8px 10px;background:color-mix(in oklab, var(--card) 94%, transparent)}
     .grow{flex:1}
 
-    /* boolean segment */
     .seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden}
     .seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer}
     .seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
 
-    /* topp: Registrering (1fr) | Graf (1.4fr) */
-    .top-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:var(--gap)} @media (max-width:900px){ .top-grid{grid-template-columns:1fr} }
+    .top-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:var(--gap)}
+    @media (max-width:900px){ .top-grid{grid-template-columns:1fr} }
 
     .legend{display:grid;gap:8px;margin-top:8px}
 
-    /* streak */
     .streak{display:flex;gap:6px}
     .dot{width:14px;height:14px;border-radius:4px;border:1px solid var(--border);background:color-mix(in oklab, var(--surface) 80%, transparent)}
     .dot.ok{background:color-mix(in oklab, var(--ok) 55%, var(--surface))}
     .dot.mid{background:color-mix(in oklab, var(--warn) 55%, var(--surface))}
     .dot.bad{background:color-mix(in oklab, var(--bad) 55%, var(--surface))}
 
-    /* kalender popover */
     .popover{position:relative}
     .popover-panel{position:absolute;top:38px;right:0;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:var(--shadow)}
     .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
@@ -72,9 +69,7 @@
     .cal button.sel{outline:2px solid var(--accent)}
     .cal .muted-day{opacity:.45}
 
-    /* tema-panel */
-    .sheet{position:fixed;right:16px;bottom:16px;width:320px;max-width:calc(100vw - 32px);
-      background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:12px;display:none}
+    .sheet{position:fixed;right:16px;bottom:16px;width:320px;max-width:calc(100vw - 32px);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:12px;display:none}
     .sheet h3{margin:0 0 8px 0}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   </style>
@@ -96,7 +91,6 @@
 
   <div class="container">
     <main>
-      <!-- TOPP: Registrering + Graf -->
       <section class="span-12 top-grid">
         <!-- Registrering -->
         <div class="card">
@@ -182,7 +176,7 @@
         <div id="fieldsList" class="list" style="margin-top:14px"></div>
       </section>
 
-      <!-- 14 dager kompakt -->
+      <!-- 14 dager -->
       <section class="card span-12">
         <div class="row" style="justify-content:space-between">
           <h2 style="margin:0">Siste 14 dager</h2>
@@ -242,13 +236,13 @@
         bd.onclick=()=>{ const c=root.getAttribute('data-density'); const n=c==='comfortable'?'compact':'comfortable'; setD(n); bd.textContent='Tetthet: '+(n==='compact'?'Kompakt':'Komfort'); };
         bt.textContent='Tema'; bd.textContent='Tetthet: '+(root.getAttribute('data-density')==='compact'?'Kompakt':'Komfort');
         const picks={accent:'th_accent',bg:'th_bg',card:'th_card',text:'th_text',border:'th_border'}; const radius=document.getElementById('th_radius');
-        const save=()=>{ const cfg={}; for(const[k,id] of Object.entries(picks)) cfg[k]=document.getElementById(id).value; cfg.radius=Number(radius.value); localStorage.setItem('lt_theme_custom',JSON.stringify(cfg)); apply(cfg); renderChart(); };
+        const save=()=>{ const cfg={}; for(const[k,id] of Object.entries(picks)) cfg[k]=document.getElementById(id).value; cfg.radius=Number(radius.value); localStorage.setItem(SK,JSON.stringify(cfg)); apply(cfg); renderChart(); };
         Object.values(picks).forEach(id=>document.getElementById(id).oninput=save); radius.oninput=save;
-        document.getElementById('th_reset').onclick=()=>{ localStorage.removeItem('lt_theme_custom'); document.documentElement.style.cssText=''; renderChart(); };
+        document.getElementById('th_reset').onclick=()=>{ localStorage.removeItem(SK); document.documentElement.style.cssText=''; renderChart(); };
         document.getElementById('th_close').onclick=()=>{ sheet.style.display='none'; };
-        document.getElementById('th_preset_nord').onclick=()=>{ localStorage.setItem('lt_theme_custom',JSON.stringify({accent:'#88c0d0',bg:'#2e3440',card:'#3b4252',text:'#e5e9f0',border:'#434c5e',radius:14})); apply(JSON.parse(localStorage.getItem('lt_theme_custom'))); renderChart(); };
-        document.getElementById('th_preset_emerald').onclick=()=>{ localStorage.setItem('lt_theme_custom',JSON.stringify({accent:'#10b981',bg:'#061a14',card:'#0b2a20',text:'#e5fff6',border:'#164036',radius:14})); apply(JSON.parse(localStorage.getItem('lt_theme_custom'))); renderChart(); };
-        document.getElementById('th_preset_rose').onclick=()=>{ localStorage.setItem('lt_theme_custom',JSON.stringify({accent:'#fb7185',bg:'#170b0d',card:'#1f0f12',text:'#ffe5e9',border:'#3a1b21',radius:16})); apply(JSON.parse(localStorage.getItem('lt_theme_custom'))); renderChart(); };
+        document.getElementById('th_preset_nord').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#88c0d0', bg:'#2e3440', card:'#3b4252', text:'#e5e9f0', border:'#434c5e', radius:14})); apply(JSON.parse(localStorage.getItem(SK))); renderChart(); };
+        document.getElementById('th_preset_emerald').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#10b981', bg:'#061a14', card:'#0b2a20', text:'#e5fff6', border:'#164036', radius:14})); apply(JSON.parse(localStorage.getItem(SK))); renderChart(); };
+        document.getElementById('th_preset_rose').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#fb7185', bg:'#170b0d', card:'#1f0f12', text:'#ffe5e9', border:'#3a1b21', radius:16})); apply(JSON.parse(localStorage.getItem(SK))); renderChart(); };
       });
     })();
 
@@ -260,10 +254,14 @@
     const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
     const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-    /* ===== IndexedDB ===== */
-    const DB_NAME='livstracker', DB_VERSION=1; let db;
+    /* ===== IndexedDB (med tombstones) ===== */
+    const DB_NAME='livstracker', DB_VERSION=2; let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result; if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'}); if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});};
+      rq.onupgradeneeded=()=>{const d=rq.result;
+        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
+        if(!d.objectStoreNames.contains('tombstones')) d.createObjectStore('tombstones',{keyPath:'id'});
+      };
       rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
     });}
     const idbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
@@ -286,7 +284,6 @@
 
       fb.auth.useDeviceLanguage();
       await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
       try{ await fb.auth.getRedirectResult(); }catch(e){ console.warn("getRedirectResult:", e?.code, e?.message); }
       try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
     }
@@ -305,68 +302,121 @@
     }
     async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){} }
 
-    /* ===== Sync: to-veis merge ved første login ===== */
-    let unsubFields=null, unsubEntries=null, firstSynced=false;
+    /* ===== Slettemarkører (tombstones) for entries ===== */
+    const isEmptyVal=(v,type)=>{
+      if(type==='boolean') return v===null || typeof v==='undefined';
+      if(type==='number')  return v===null || v==='' || typeof v==='undefined' || Number.isNaN(v);
+      if(type==='text')    return v===null || v==='' || typeof v==='undefined';
+      return v==null || v===''; };
+    const isEmptyEntry=(values)=>{
+      if(!values) return true;
+      for(const [fid,v] of Object.entries(values)){
+        const f=state.fields.find(x=>x.id===fid);
+        if(!f) continue;
+        if(!isEmptyVal(v,f.type)) return false;
+      } return true;
+    };
+    async function markEntryDeleted(date){
+      await idbDelete('entries', date);
+      await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
+      delete state.entries[date];
+      if(fb.enabled && state.uid){
+        const u=fb.db.collection('users').doc(state.uid);
+        await u.collection('entries').doc(date).delete().catch(()=>{});
+        await u.collection('tombstones').doc(`entry_${date}`).set({type:'entry',date,deletedAt:Date.now()},{merge:true});
+      }
+    }
+    async function clearEntryTombstone(date){
+      await idbDelete('tombstones', `entry:${date}`);
+      if(fb.enabled && state.uid){
+        await fb.db.collection('users').doc(state.uid).collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
+      }
+    }
+
+    /* ===== Sync: to-veis merge + tombstones ===== */
+    let unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
     async function reconcileAndUpload(uid){
-      // Why: sikre at enheter ser samme data (lokal↔sky merge)
-      const uref=fb.db.collection('users').doc(uid);
-      const [fsSnap, esSnap]=await Promise.all([uref.collection('fields').get(), uref.collection('entries').get()]);
+      const u=fb.db.collection('users').doc(uid);
+      const [fsSnap, esSnap, tsSnap] = await Promise.all([
+        u.collection('fields').get(),
+        u.collection('entries').get(),
+        u.collection('tombstones').get().catch(()=>({empty:true, forEach:()=>{}}))
+      ]);
 
-      const remoteFields=new Map(); fsSnap.forEach(d=>remoteFields.set(d.id, d.data()));
-      const remoteEntries=new Map(); esSnap.forEach(d=>remoteEntries.set(d.id, d.data()));
+      const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data(); remoteFields.set(v.id,v);});
+      const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data(); remoteEntries.set(v.date, v.values||{});});
+      const remoteEntryTombs=new Set(); tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) remoteEntryTombs.add(v.date);});
 
-      const localFields = state.fields.map(f=>({...f, updatedAt: f.updatedAt || Date.now()}));
+      const localFields = state.fields.map(f=>({...f, updatedAt:f.updatedAt||Date.now()}));
       const localEntries = {...state.entries};
+      const localTombsArr = await idbGetAll('tombstones');
+      const localEntryTombs = new Set(localTombsArr.filter(t=>t.type==='entry').map(t=>t.date));
 
-      // Merge fields: nyeste updatedAt vinner (mangler -> lokal vinner)
-      const byId=new Map(remoteFields); for(const lf of localFields){
+      // fields: nyeste vinner
+      const byId=new Map(remoteFields);
+      for(const lf of localFields){
         const rf=byId.get(lf.id);
         if(!rf || (lf.updatedAt||0) >= (rf.updatedAt||0)) byId.set(lf.id, {...rf, ...lf, updatedAt: lf.updatedAt||Date.now()});
       }
       const mergedFields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
 
-      // Merge entries: per dato – kombiner keys (konflikt: lokal tar prioritet, siden samme bruker)
-      const mergedEntries={};
-      remoteEntries.forEach(v=>{ mergedEntries[v.date]=v.values||{}; });
-      for(const [date,vals] of Object.entries(localEntries)){
-        mergedEntries[date]={...(mergedEntries[date]||{}), ...vals};
-      }
+      // entries: kombiner, men tombstones fjerner
+      const mergedEntries={}; remoteEntries.forEach((vals,date)=>{ mergedEntries[date]={...vals}; });
+      for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}), ...vals}; }
+      const allTombs=new Set([...remoteEntryTombs, ...localEntryTombs]);
+      for(const date of allTombs){ delete mergedEntries[date]; }
 
-      // Skriv til sky
+      // skriv til sky
       const batch=fb.db.batch();
-      mergedFields.forEach(f=>batch.set(uref.collection('fields').doc(f.id), {...f, updatedAt:f.updatedAt||Date.now()},{merge:true}));
-      Object.entries(mergedEntries).forEach(([date,values])=>batch.set(uref.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true}));
+      mergedFields.forEach(f=>batch.set(u.collection('fields').doc(f.id), {...f, updatedAt:f.updatedAt||Date.now()},{merge:true}));
+      for(const [date,values] of Object.entries(mergedEntries)){
+        batch.set(u.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true});
+      }
+      for(const date of allTombs){
+        batch.delete(u.collection('entries').doc(date));
+        batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true});
+      }
       await batch.commit();
 
-      // Speil lokalt
-      state.fields=mergedFields;
-      state.entries=mergedEntries;
+      // speil lokalt
+      state.fields=mergedFields; state.entries=mergedEntries;
       for(const f of mergedFields) await idbSet('fields', f);
-      for(const [date,values] of Object.entries(mergedEntries)) await idbSet('entries', {date, values, updatedAt: Date.now()});
+      for(const [date,values] of Object.entries(mergedEntries)) await idbSet('entries', {date, values, updatedAt:Date.now()});
+      for(const date of allTombs) await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
     }
 
     async function startSync(uid){
-      if(!firstSynced){
-        await reconcileAndUpload(uid);
-        firstSynced=true;
-      }
-      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
+      if(!firstSynced){ await reconcileAndUpload(uid); firstSynced=true; }
+      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
       const u=fb.db.collection('users').doc(uid);
+
       unsubFields = u.collection('fields').onSnapshot(async snap=>{
         const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v);});
         state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
         for(const f of state.fields) await idbSet('fields', f);
         renderAll();
       });
+
       unsubEntries = u.collection('entries').onSnapshot(async snap=>{
         const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
         state.entries=all;
         for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
         renderAll();
       });
+
+      // lytte på tombstones → fjern lokalt når andre enheter sletter
+      unsubTombs = u.collection('tombstones').onSnapshot(async snap=>{
+        const toDelete=[]; snap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) toDelete.push(v.date);});
+        for(const date of toDelete){
+          delete state.entries[date];
+          await idbDelete('entries', date);
+          await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
+        }
+        if(toDelete.length){ renderAll(); }
+      });
     }
 
-    /* ===== CRUD (pass på updatedAt) ===== */
+    /* ===== CRUD (updatedAt + sletting når tom) ===== */
     async function pushField(f){
       const val={...f, updatedAt:f.updatedAt||Date.now()};
       await idbSet('fields', val);
@@ -380,14 +430,20 @@
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('fields').doc(id).delete().catch(()=>{});
       }
-      for(const [d,vals] of Object.entries(state.entries)){ if(id in vals){ delete vals[id]; await pushEntry(d, vals); } }
+      for(const [d,vals] of Object.entries(state.entries)){
+        if(id in vals){ delete vals[id]; await pushEntry(d, vals); }
+      }
       renderAll();
     }
     async function pushEntry(date, values){
+      if(isEmptyEntry(values)){ await markEntryDeleted(date); renderHistory14(); renderChart(); return; } // hvorfor: synk slettinger
       const val={date, values, updatedAt: Date.now()};
       await idbSet('entries', val);
+      await idbDelete('tombstones', `entry:${date}`);
       if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date).set(val,{merge:true});
+        const u=fb.db.collection('users').doc(state.uid);
+        await u.collection('entries').doc(date).set(val,{merge:true});
+        await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
       }
     }
 
@@ -479,10 +535,8 @@
     }
     async function upsertField({id,name,type,goal,includeInProgress,axisHint}){
       const f={id:id||uid(),name:name?.trim()||'Uten navn',type:type||'number',
-        goal:(type==='number'&&goal!=='')?Number(goal):undefined,
-        includeInProgress:!!includeInProgress,
-        axisHint:axisHint||(type==='number'?'right':undefined),
-        updatedAt:Date.now()
+        goal:(type==='number'&&goal!=='')?Number(goal):undefined, includeInProgress:!!includeInProgress,
+        axisHint:axisHint||(type==='number'?'right':undefined), updatedAt:Date.now()
       };
       const i=state.fields.findIndex(x=>x.id===f.id); if(i>=0) state.fields[i]={...state.fields[i],...f}; else state.fields.push(f);
       await pushField(i>=0?state.fields[i]:f); renderAll();
@@ -566,14 +620,12 @@
 
     function renderHistory14(){
       const dates=lastNDates(14).reverse();
-      // streak
       streakEl.innerHTML=''; dates.forEach(d=>{
         const vals=getEntry(d); let score=0,max=0;
         state.fields.filter(f=>f.type==='number'&&typeof f.goal==='number'&&f.includeInProgress).forEach(f=>{max++; const v=Number(vals[f.id]||0); if(v>=f.goal) score++;});
         const dot=document.createElement('div'); dot.className='dot'; if(max===0){} else if(score===0) dot.classList.add('bad'); else if(score<max) dot.classList.add('mid'); else dot.classList.add('ok');
         dot.title=new Date(d).toLocaleDateString('no-NO')+` – ${score}/${max}`; streakEl.appendChild(dot);
       });
-      // mini-kort
       miniCards.innerHTML='';
       state.fields.filter(f=>f.type==='number').forEach(f=>{
         const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
@@ -581,7 +633,6 @@
         const el=document.createElement('div'); el.className='item'; el.innerHTML=`<div class="grow"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div class="kpi">${avg!==null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`;
         miniCards.appendChild(el);
       });
-      // 3 siste (eller utvid)
       history14.innerHTML='';
       const selected=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse();
       selected.forEach(d=>{
@@ -605,17 +656,14 @@
 
     /* ===== Bindings ===== */
     function bindUI(){
-      // import/eksport
       document.getElementById('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url); };
       document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
       document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ const data=JSON.parse(t); const byId=new Map(state.fields.map(f=>[f.id,f])); (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()})); state.fields=[...byId.values()]; for(const f of state.fields) pushField(f); for(const [d,vals] of Object.entries(data.entries||{})) pushEntry(d, vals); renderAll(); });};
 
-      // nett + auth
       document.getElementById('btnLogin').onclick=signIn; document.getElementById('btnLogout').onclick=signOut;
       const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');};
       window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
 
-      // felt
       document.getElementById('btnAddField').onclick=async()=>{ await upsertField({name:f_name.value,type:f_type.value,goal:f_goal.value,includeInProgress:f_include.checked}); f_name.value=''; f_goal.value=''; f_include.checked=false; };
       document.getElementById('btnPresets').onclick=async()=>{ const presets=[
         {name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,axisHint:'right'},
@@ -626,21 +674,16 @@
       ]; for(const p of presets) await upsertField(p); };
       document.getElementById('btnDeleteAll').onclick=async()=>{ if(!confirm('Slette alle felt og data?')) return; const fs=[...state.fields]; for(const f of fs) await deleteField(f.id); for(const d of Object.keys(state.entries)){ await pushEntry(d,{}); delete state.entries[d]; } renderAll(); };
 
-      // graf
       periodEl.onchange=renderChart; axisEl.onchange=e=>{state.axisMapMode=e.target.value; renderChart()}; showGoalsEl.onchange=renderChart;
-
-      // dato
       dateInput.onchange=()=>{ state.currentDate=dateInput.value; renderToday(); renderHistory14(); renderChart(); }
       btnPrev.onclick=()=>{ state.currentDate=iso(addDays(state.currentDate,-1)); dateInput.value=state.currentDate; renderToday(); renderHistory14(); renderChart(); }
       btnNext.onclick=()=>{ state.currentDate=iso(addDays(state.currentDate, 1)); dateInput.value=state.currentDate; renderToday(); renderHistory14(); renderChart(); }
 
-      // kalender
       document.getElementById('btnCal').onclick=()=>{ calPanel.style.display = calPanel.style.display==='none'||!calPanel.style.display?'block':'none'; renderCalendar(); };
       document.getElementById('calPrev').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(),calMonth.getUTCMonth()-1,1)); renderCalendar(); };
       document.getElementById('calNext').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(),calMonth.getUTCMonth()+1,1)); renderCalendar(); };
       document.addEventListener('click',e=>{ if(!document.getElementById('btnCal').contains(e.target) && !calPanel.contains(e.target)) calPanel.style.display='none' });
 
-      // 14d toggle
       btnToggleHistory.onclick=()=>{ state.historyExpanded=!state.historyExpanded; renderHistory14(); };
     }
 
@@ -667,7 +710,7 @@
             syncStatus.textContent='Ikke pålogget';
             document.getElementById('btnLogout').style.display='none';
             document.getElementById('btnLogin').style.display='inline-block';
-            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
+            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
           }
         });
       } else {
