@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Livstracker – registrering & graf</title>
+  <title>Livstracker – synk på tvers av enheter</title>
 
   <!-- Vendor -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
@@ -254,8 +254,8 @@
     const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
     const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-    /* ===== IndexedDB (med tombstones) ===== */
-    const DB_NAME='livstracker', DB_VERSION=2; let db;
+    /* ===== IndexedDB (v3 med tombstones) ===== */
+    const DB_NAME='livstracker', DB_VERSION=3; let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
       rq.onupgradeneeded=()=>{const d=rq.result;
         if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
@@ -271,9 +271,24 @@
     /* ===== State ===== */
     let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[], currentDate:todayISO(), historyExpanded:false };
 
-    /* ===== Firebase init (robust) ===== */
+    /* ===== Firebase init (robust + fallback) ===== */
     let fb={enabled:false, app:null, auth:null, db:null};
     async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
+
+    async function setBestPersistence(auth){
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); return 'LOCAL'; }catch{}
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); return 'SESSION'; }catch{}
+      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE); return 'NONE';
+    }
+    function envLikelyBlocksPopupOrCookies(){
+      const ua=navigator.userAgent.toLowerCase();
+      const isIOS=/iphone|ipad|ipod/.test(ua);
+      const isSafari=/^((?!chrome|android).)*safari/.test(ua);
+      const isBrave=(navigator.brave && typeof navigator.brave.isBrave==='function');
+      const storageOk=(()=>{try{localStorage.setItem('__t','1');localStorage.removeItem('__t');return true;}catch{return false;}})();
+      return isIOS||isSafari||isBrave||!storageOk;
+    }
+
     async function tryInitFirebase(){
       if(!FIREBASE_CONFIG?.apiKey) return;
       await waitForFirebase();
@@ -283,26 +298,29 @@
       fb.enabled=true;
 
       fb.auth.useDeviceLanguage();
-      await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      try{ await fb.auth.getRedirectResult(); }catch(e){ console.warn("getRedirectResult:", e?.code, e?.message); }
+      const mode=await setBestPersistence(fb.auth);
+      try{ await fb.auth.getRedirectResult(); }catch(e){ console.warn('redirect result:', e?.code, e?.message); }
       try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
+
+      const el=document.getElementById('syncStatus'); if(el) el.title=`Auth persistence: ${mode}`;
     }
     async function signIn(){
       if(!fb.enabled) return alert('Firebase ikke konfigurert.');
       const provider=new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({prompt:'select_account'});
+      if(envLikelyBlocksPopupOrCookies()) return fb.auth.signInWithRedirect(provider);
       try{ await fb.auth.signInWithPopup(provider); }
       catch(e){
         const code=e?.code||'';
-        if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')||code.includes('third-party-cookie')||code.includes('auth/unauthorized-domain')){
-          await fb.auth.signInWithRedirect(provider); return;
+        if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')||code.includes('third-party-cookie')||code.includes('unauthorized-domain')||code.includes('blocked-by-extension')){
+          return fb.auth.signInWithRedirect(provider);
         }
-        alert(`Login-feil: ${code} ${e?.message||e}`);
+        alert(`Kunne ikke logge inn: ${code}`); console.error('signIn error:', code, e?.message);
       }
     }
     async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){} }
 
-    /* ===== Slettemarkører (tombstones) for entries ===== */
+    /* ===== Tombstones (entry + field) ===== */
     const isEmptyVal=(v,type)=>{
       if(type==='boolean') return v===null || typeof v==='undefined';
       if(type==='number')  return v===null || v==='' || typeof v==='undefined' || Number.isNaN(v);
@@ -316,6 +334,7 @@
         if(!isEmptyVal(v,f.type)) return false;
       } return true;
     };
+
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -326,15 +345,22 @@
         await u.collection('tombstones').doc(`entry_${date}`).set({type:'entry',date,deletedAt:Date.now()},{merge:true});
       }
     }
-    async function clearEntryTombstone(date){
-      await idbDelete('tombstones', `entry:${date}`);
+    async function markFieldDeleted(fieldId){
+      await idbDelete('fields', fieldId);
+      await idbSet('tombstones', {id:`field:${fieldId}`, type:'field', fieldId, deletedAt:Date.now()});
+      state.fields=state.fields.filter(f=>f.id!==fieldId);
+      // Fjern verdi for feltet i alle dager lokalt + push oppdatert dag
+      for(const [d,vals] of Object.entries(state.entries)){ if(fieldId in vals){ delete vals[fieldId]; await pushEntry(d, vals); } }
       if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
+        const u=fb.db.collection('users').doc(state.uid);
+        await u.collection('fields').doc(fieldId).delete().catch(()=>{});
+        await u.collection('tombstones').doc(`field_${fieldId}`).set({type:'field',fieldId,deletedAt:Date.now()},{merge:true});
       }
     }
 
-    /* ===== Sync: to-veis merge + tombstones ===== */
+    /* ===== Sync: to-veis merge + tombstones (fields+entries) ===== */
     let unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
+
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap, esSnap, tsSnap] = await Promise.all([
@@ -345,34 +371,52 @@
 
       const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data(); remoteFields.set(v.id,v);});
       const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data(); remoteEntries.set(v.date, v.values||{});});
-      const remoteEntryTombs=new Set(); tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) remoteEntryTombs.add(v.date);});
+      const remoteFieldTombs=new Set(), remoteEntryTombs=new Set();
+      tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{
+        const v=d.data(); if(v.type==='entry'&&v.date) remoteEntryTombs.add(v.date); if(v.type==='field'&&v.fieldId) remoteFieldTombs.add(v.fieldId);
+      });
 
       const localFields = state.fields.map(f=>({...f, updatedAt:f.updatedAt||Date.now()}));
       const localEntries = {...state.entries};
       const localTombsArr = await idbGetAll('tombstones');
       const localEntryTombs = new Set(localTombsArr.filter(t=>t.type==='entry').map(t=>t.date));
+      const localFieldTombs = new Set(localTombsArr.filter(t=>t.type==='field').map(t=>t.fieldId));
 
-      // fields: nyeste vinner
+      // fields: nyeste vinner, men tombstones fjerner
       const byId=new Map(remoteFields);
       for(const lf of localFields){
+        if(remoteFieldTombs.has(lf.id) || localFieldTombs.has(lf.id)) continue; // respekter sletting
         const rf=byId.get(lf.id);
         if(!rf || (lf.updatedAt||0) >= (rf.updatedAt||0)) byId.set(lf.id, {...rf, ...lf, updatedAt: lf.updatedAt||Date.now()});
       }
+      for(const fid of new Set([...remoteFieldTombs, ...localFieldTombs])) byId.delete(fid);
       const mergedFields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
 
-      // entries: kombiner, men tombstones fjerner
+      // entries: kombiner, men entry-tombstones fjerner
       const mergedEntries={}; remoteEntries.forEach((vals,date)=>{ mergedEntries[date]={...vals}; });
       for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}), ...vals}; }
-      const allTombs=new Set([...remoteEntryTombs, ...localEntryTombs]);
-      for(const date of allTombs){ delete mergedEntries[date]; }
+
+      // Fjern keys for field-tombstones
+      const allFieldTombs=new Set([...remoteFieldTombs, ...localFieldTombs]);
+      if(allFieldTombs.size){
+        for(const [date,vals] of Object.entries(mergedEntries)){
+          for(const fid of allFieldTombs){ if(fid in vals) delete vals[fid]; }
+          if(isEmptyEntry(vals)) delete mergedEntries[date];
+        }
+      }
+      // Fjern datoer for entry-tombstones
+      const allEntryTombs=new Set([...remoteEntryTombs, ...localEntryTombs]);
+      for(const date of allEntryTombs) delete mergedEntries[date];
 
       // skriv til sky
       const batch=fb.db.batch();
-      mergedFields.forEach(f=>batch.set(u.collection('fields').doc(f.id), {...f, updatedAt:f.updatedAt||Date.now()},{merge:true}));
-      for(const [date,values] of Object.entries(mergedEntries)){
-        batch.set(u.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true});
+      for(const f of mergedFields) batch.set(u.collection('fields').doc(f.id), {...f, updatedAt:f.updatedAt||Date.now()},{merge:true});
+      for(const [date,values] of Object.entries(mergedEntries)) batch.set(u.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true});
+      for(const fid of allFieldTombs){
+        batch.delete(u.collection('fields').doc(fid));
+        batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true});
       }
-      for(const date of allTombs){
+      for(const date of allEntryTombs){
         batch.delete(u.collection('entries').doc(date));
         batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true});
       }
@@ -382,7 +426,8 @@
       state.fields=mergedFields; state.entries=mergedEntries;
       for(const f of mergedFields) await idbSet('fields', f);
       for(const [date,values] of Object.entries(mergedEntries)) await idbSet('entries', {date, values, updatedAt:Date.now()});
-      for(const date of allTombs) await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
+      for(const fid of allFieldTombs) await idbSet('tombstones', {id:`field:${fid}`, type:'field', fieldId:fid, deletedAt:Date.now()});
+      for(const date of allEntryTombs) await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
     }
 
     async function startSync(uid){
@@ -404,15 +449,25 @@
         renderAll();
       });
 
-      // lytte på tombstones → fjern lokalt når andre enheter sletter
       unsubTombs = u.collection('tombstones').onSnapshot(async snap=>{
-        const toDelete=[]; snap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) toDelete.push(v.date);});
-        for(const date of toDelete){
-          delete state.entries[date];
-          await idbDelete('entries', date);
-          await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
-        }
-        if(toDelete.length){ renderAll(); }
+        let changed=false;
+        snap.forEach(async d=>{
+          const v=d.data();
+          if(v.type==='entry' && v.date){
+            if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; }
+            await idbDelete('entries', v.date);
+            await idbSet('tombstones', {id:`entry:${v.date}`, type:'entry', date:v.date, deletedAt:v.deletedAt||Date.now()});
+          }
+          if(v.type==='field' && v.fieldId){
+            const existed=state.fields.some(f=>f.id===v.fieldId);
+            if(existed){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; }
+            await idbDelete('fields', v.fieldId);
+            await idbSet('tombstones', {id:`field:${v.fieldId}`, type:'field', fieldId:v.fieldId, deletedAt:v.deletedAt||Date.now()});
+            // fjern feltverdier fra alle dager
+            for(const [date,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date,values:vals,updatedAt:Date.now()}); } }
+          }
+        });
+        if(changed) renderAll();
       });
     }
 
@@ -422,21 +477,15 @@
       await idbSet('fields', val);
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('fields').doc(val.id).set(val,{merge:true});
+        // rydde ev. field-tombstone i sky
+        await fb.db.collection('users').doc(state.uid).collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{});
+        await idbDelete('tombstones', `field:${val.id}`);
       }
     }
-    async function deleteField(id){
-      state.fields=state.fields.filter(f=>f.id!==id);
-      await idbDelete('fields', id);
-      if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('fields').doc(id).delete().catch(()=>{});
-      }
-      for(const [d,vals] of Object.entries(state.entries)){
-        if(id in vals){ delete vals[id]; await pushEntry(d, vals); }
-      }
-      renderAll();
-    }
+    async function deleteField(fieldId){ await markFieldDeleted(fieldId); renderAll(); }
+
     async function pushEntry(date, values){
-      if(isEmptyEntry(values)){ await markEntryDeleted(date); renderHistory14(); renderChart(); return; } // hvorfor: synk slettinger
+      if(isEmptyEntry(values)){ await markEntryDeleted(date); renderHistory14(); renderChart(); return; }
       const val={date, values, updatedAt: Date.now()};
       await idbSet('entries', val);
       await idbDelete('tombstones', `entry:${date}`);
@@ -672,7 +721,11 @@
         {name:'Takknemlighet',type:'text'},
         {name:'Alkoholfri dag',type:'boolean',includeInProgress:true}
       ]; for(const p of presets) await upsertField(p); };
-      document.getElementById('btnDeleteAll').onclick=async()=>{ if(!confirm('Slette alle felt og data?')) return; const fs=[...state.fields]; for(const f of fs) await deleteField(f.id); for(const d of Object.keys(state.entries)){ await pushEntry(d,{}); delete state.entries[d]; } renderAll(); };
+      document.getElementById('btnDeleteAll').onclick=async()=>{ if(!confirm('Slette alle felt og data?')) return;
+        const fs=[...state.fields]; for(const f of fs) await deleteField(f.id);
+        for(const d of Object.keys(state.entries)){ await pushEntry(d,{}); delete state.entries[d]; }
+        renderAll();
+      };
 
       periodEl.onchange=renderChart; axisEl.onchange=e=>{state.axisMapMode=e.target.value; renderChart()}; showGoalsEl.onchange=renderChart;
       dateInput.onchange=()=>{ state.currentDate=dateInput.value; renderToday(); renderHistory14(); renderChart(); }
