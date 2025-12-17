@@ -21,6 +21,7 @@
     .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
     .chip{padding:6px 10px;border-radius:999px;border:1px solid #2a3342;cursor:pointer}
   </style>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
@@ -71,17 +72,15 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none" />
 
   <script>
-    // ==== Firebase: dine nøkler ====
-   const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
-  authDomain: "livstracker.firebaseapp.com",
-  projectId: "livstracker",
-  storageBucket: "livstracker.firebasestorage.app",
-  messagingSenderId: "885451038080",
-  appId: "1:885451038080:web:3df131af07a258a5bc7565"
-};
-
-
+    // ==== Firebase config (din nye) ====
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
+      authDomain: "livstracker.firebaseapp.com",
+      projectId: "livstracker",
+      storageBucket: "livstracker.firebasestorage.app",
+      messagingSenderId: "885451038080",
+      appId: "1:885451038080:web:3df131af07a258a5bc7565"
+    };
 
     // ==== Dato / utils ====
     const todayISO = () => new Date().toISOString().slice(0,10);
@@ -103,64 +102,60 @@
     // ==== App-state ====
     let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[] };
 
-    // ==== Firebase init + persistence (ROBUST) ====
+    // ==== Firebase handles ====
     let fb = { enabled:false, app:null, auth:null, db:null };
 
-    function waitForFirebase() {
-      return new Promise((resolve, reject) => {
-        const start = Date.now();
-        (function check() {
-          if (window.firebase && firebase.auth && firebase.firestore) return resolve();
-          if (Date.now() - start > 8000) return reject(new Error("Firebase SDK lastet ikke (timeout)"));
-          setTimeout(check, 50);
-        })();
-      });
-    }
-
-    async function tryInitFirebase() {
+    async function tryInitFirebase(){
       if (!FIREBASE_CONFIG?.apiKey) return;
+      if (!window.firebase) throw new Error("Firebase SDK ikke lastet");
 
-      await waitForFirebase();
-
-      if (!firebase.apps.length) fb.app = firebase.initializeApp(FIREBASE_CONFIG);
-      else fb.app = firebase.app();
-
+      fb.app  = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
       fb.auth = firebase.auth();
       fb.db   = firebase.firestore();
       fb.enabled = true;
 
-      try { await fb.db.enablePersistence({ synchronizeTabs: true }); } catch(e) {}
+      fb.auth.useDeviceLanguage();
 
-      // ✅ VIKTIG: fullfør redirect-login (ellers kan det se ut som "ingenting skjer")
+      // Viktig: sørg for at login faktisk blir lagret mellom refresh/redirect
+      await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+      // Fullfør redirect-flow hvis vi kom tilbake fra Google
       try {
         await fb.auth.getRedirectResult();
       } catch (e) {
-        console.warn("RedirectResult error:", e?.code, e?.message);
+        console.warn("getRedirectResult error:", e?.code, e?.message);
+        alert(`Redirect-feil: ${e?.code || ""} ${e?.message || e}`);
       }
+
+      // Firestore offline (valgfritt)
+      try { await fb.db.enablePersistence({ synchronizeTabs:true }); } catch(e) {}
     }
 
-    // Debug (så du ser faktiske feil)
-    window.addEventListener("error", (e) => console.log("JS error:", e.message, e.error));
-    window.addEventListener("unhandledrejection", (e) => console.log("Promise error:", e.reason));
-
-    // ==== Auth: redirect (ingen popups) ====
+    // ==== Auth (popup først, fallback redirect) ====
     async function signIn(){
+      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
+      const provider = new firebase.auth.GoogleAuthProvider();
+
       try {
-        if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-        const provider = new firebase.auth.GoogleAuthProvider();
-        await fb.auth.signInWithRedirect(provider);
+        await fb.auth.signInWithPopup(provider);
       } catch (e) {
+        // fallback til redirect hvis popup er blokkert / ikke støttet
+        const code = e?.code || "";
+        if (code.includes("popup") || code.includes("operation-not-supported") || code.includes("web-storage-unsupported")) {
+          await fb.auth.signInWithRedirect(provider);
+          return;
+        }
         console.warn("Sign-in error:", e?.code, e?.message);
-        alert(`Login-feil: ${e?.code || ''} ${e?.message || e}`);
+        alert(`Login-feil: ${e?.code || ""} ${e?.message || e}`);
       }
     }
     async function signOut(){
-      try { if(fb.enabled && fb.auth.currentUser) await fb.auth.signOut(); }
-      catch(e){ console.warn("Sign-out error:", e); }
+      try { if(fb.enabled) await fb.auth.signOut(); } catch(e){}
     }
 
     // ==== Synk: sky <-> lokal ====
     let unsubFields=null, unsubEntries=null, firstUploaded=false;
+
     async function collectionHasAny(uid){
       const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
       const e=await fb.db.collection('users').doc(uid).collection('entries').limit(1).get();
@@ -173,7 +168,11 @@
       await batch.commit();
     }
     async function startSync(uid){
-      if(!firstUploaded){ const hasAny=await collectionHasAny(uid); if(!hasAny) await uploadAllLocal(uid); firstUploaded=true; }
+      if(!firstUploaded){
+        const hasAny=await collectionHasAny(uid);
+        if(!hasAny) await uploadAllLocal(uid);
+        firstUploaded=true;
+      }
       if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
 
       unsubFields = fb.db.collection('users').doc(uid).collection('fields')
@@ -192,6 +191,7 @@
           renderAll();
         });
     }
+
     async function pushField(f){
       await idbSet('fields', f);
       if(fb.enabled && state.uid){
@@ -208,11 +208,14 @@
     // ==== Import/Eksport ====
     function exportJSON(){
       const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});
-      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click();
+      URL.revokeObjectURL(url);
     }
     async function importJSON(file){
       const text=await file.text(); const data=JSON.parse(text);
-      const byId=new Map(state.fields.map(f=>[f.id,f])); (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()}));
+      const byId=new Map(state.fields.map(f=>[f.id,f]));
+      (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()}));
       state.fields=[...byId.values()];
       for(const f of state.fields) await pushField(f);
       for(const [d,vals] of Object.entries(data.entries||{})) await pushEntry(d, vals);
@@ -252,6 +255,7 @@
       });
       return ds;
     }
+
     function renderChart(){
       const period=periodEl.value, grouping=groupingEl.value, agg=aggEl.value, smooth=smoothEl.value, showGoals=showGoalsEl.checked;
       const since=dateRange(period);
@@ -304,7 +308,7 @@
 
     function renderFieldSelect(){
       fieldSelect.innerHTML='';
-      const byId=new Map(state.fields.map(f=>[f.id,f])); // dedupe
+      const byId=new Map(state.fields.map(f=>[f.id,f]));
       [...byId.values()].filter(f=>f.type==='number').forEach(f=>{
         const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name; fieldSelect.appendChild(opt);
       });
@@ -322,6 +326,7 @@
       showGoalsEl.onchange=renderChart;
       document.getElementById('btnLogin').onclick=signIn;
       document.getElementById('btnLogout').onclick=signOut;
+
       const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');};
       window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
     }
@@ -358,7 +363,6 @@
       renderAll();
     }
 
-    // Demo-data så grafen ikke er tom
     async function ensureDemo(){
       if(state.fields.length) return;
       await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left',updatedAt:Date.now()});
@@ -373,7 +377,7 @@
 
     window.addEventListener('load', () => { boot().then(ensureDemo); });
 
-    /* ---- Firestore Rules (sørg for at disse er publisert) ----
+    /* Firestore Rules:
     rules_version = '2';
     service cloud.firestore {
       match /databases/{db}/documents {
