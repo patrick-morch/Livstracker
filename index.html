@@ -4,71 +4,284 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Livstracker</title>
+  <title>Livstracker – registrering & tydelig graf</title>
 
-  <!-- Chart.js + Firebase (compat) -->
+  <!-- Vendor -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js" defer></script>
 
   <style>
-    /* … behold din stil (forkortet for plass) … */
-    :root{--bg:#0b0d10;--card:#11151a;--text:#e7e7e7;--muted:#9aa4af;--border:#1d232c;--accent:#5aa7ff}
-    *{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:14px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(11,13,16,.9);backdrop-filter:blur(8px)}
-    .btn{padding:8px 12px;border:1px solid var(--border);background:#151922;color:var(--text);border-radius:10px;cursor:pointer}
-    .btn.ghost{background:transparent}
+    :root{
+      --radius: 14px; --gap: 16px; --font: 14px/1.5 system-ui,Inter,Roboto,sans-serif;
+      --bg:#0b0d10; --card:#11151a; --surface:#0f131a; --text:#e7e7e7; --muted:#9aa4af; --border:#1d232c; --accent:#5aa7ff;
+      --ring: 0 0 0 2px rgba(90,167,255,.35); --shadow: 0 8px 24px rgba(0,0,0,.35);
+      --ok:#22c55e; --warn:#eab308; --bad:#ef4444;
+    }
+    :root[data-theme="light"]{
+      --bg:#f6f7f9; --card:#fff; --surface:#fff; --text:#0a0c10; --muted:#5b636e; --border:#dfe3ea; --accent:#2563eb;
+      --ring: 0 0 0 2px rgba(37,99,235,.25); --shadow: 0 8px 28px rgba(16,24,40,.08);
+    }
+    :root[data-density="compact"]{ --gap: 10px; --radius: 10px; }
+
+    *{box-sizing:border-box} body{margin:0; font:var(--font); background:var(--bg); color:var(--text)}
+    header{position:sticky; top:0; z-index:10; display:flex; gap:10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); background:color-mix(in oklab, var(--bg) 80%, transparent); backdrop-filter: blur(10px);}
+    h1{font-size:16px; margin:0}
+    .container{max-width:1200px; margin:0 auto; padding:0 16px}
+    main{padding:var(--gap) 0; display:grid; gap:var(--gap); grid-template-columns: repeat(12, minmax(0,1fr));}
+    .span-12{grid-column:span 12}
+    @media (max-width:960px){ main{grid-template-columns:repeat(6,1fr)} .span-12{grid-column:span 6} }
+    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:calc(var(--gap) - 2px); box-shadow:var(--shadow)}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
     .muted{color:var(--muted)} .small{font-size:12px}
+    .btn{padding:8px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:10px; cursor:pointer; transition:transform .04s}
+    .btn:hover{transform:translateY(-1px)} .btn.ghost{background:transparent}
+    .btn.primary{background:var(--accent); color:#fff; border-color:transparent}
+    .btn.danger{background:#b91c1c; color:#fff; border-color:#7f1d1d}
+    .input,.select,textarea{background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:10px}
+    .input:focus-visible,.select:focus-visible,textarea:focus-visible,.btn:focus-visible{outline:none; box-shadow:var(--ring)}
+    label{display:flex; flex-direction:column; gap:6px}
+    .list{display:grid; gap:8px}
+    .item{display:flex; align-items:center; gap:10px; border:1px dashed var(--border); border-radius:10px; padding:8px 10px; background:color-mix(in oklab, var(--card) 94%, transparent)}
+    .grow{flex:1}
+
+    /* boolean segment */
+    .seg{display:inline-flex; border:1px solid var(--border); border-radius:999px; overflow:hidden}
+    .seg button{border:0; background:transparent; padding:6px 12px; cursor:pointer}
+    .seg button[aria-pressed="true"]{background:var(--accent); color:#fff}
+
+    /* topp: Registrering (1fr) | Graf (1.4fr) */
+    .top-grid{display:grid; grid-template-columns: 1fr 1.4fr; gap:var(--gap)}
+    @media (max-width:900px){ .top-grid{grid-template-columns:1fr} }
+
+    .legend{display:grid; gap:8px; margin-top:8px}
+
+    /* streak */
+    .streak{display:flex; gap:6px}
+    .dot{width:14px; height:14px; border-radius:4px; border:1px solid var(--border); background:color-mix(in oklab, var(--surface) 80%, transparent)}
+    .dot.ok{background:color-mix(in oklab, var(--ok) 55%, var(--surface))}
+    .dot.mid{background:color-mix(in oklab, var(--warn) 55%, var(--surface))}
+    .dot.bad{background:color-mix(in oklab, var(--bad) 55%, var(--surface))}
+
+    /* kalender popover */
+    .popover{position:relative}
+    .popover-panel{position:absolute; top:38px; right:0; z-index:20; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; box-shadow:var(--shadow)}
+    .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px}
+    .cal .hd{font-size:12px; color:var(--muted); text-align:center}
+    .cal button{padding:6px 0; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:8px; cursor:pointer}
+    .cal button.sel{outline:2px solid var(--accent)}
+    .cal .muted-day{opacity:.45}
+
+    /* tema-panel */
+    .sheet{position:fixed; right:16px; bottom:16px; width:320px; max-width:calc(100vw - 32px);
+      background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:12px; display:none}
+    .sheet h3{margin:0 0 8px 0}
+    .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   </style>
 </head>
 <body>
   <header>
-    <h1>Livstracker</h1>
-    <span id="net" class="small muted"></span>
-    <span class="muted">·</span>
-    <span id="syncStatus" class="small muted">Ikke pålogget</span>
-    <div style="flex:1"></div>
-    <button id="btnImport" class="btn">Importer JSON</button>
-    <button id="btnExport" class="btn ghost">Eksporter JSON</button>
-    <button id="btnLogin" class="btn">Logg inn</button>
-    <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
+    <div class="container" style="display:flex;align-items:center;gap:10px">
+      <h1>Livstracker</h1>
+      <span id="net" class="small muted"></span><span class="muted">·</span><span id="syncStatus" class="small muted">Ikke pålogget</span>
+      <div style="flex:1"></div>
+      <button id="btnTheme" class="btn ghost">Tema</button>
+      <button id="btnDensity" class="btn ghost">Tetthet</button>
+      <button id="btnImport" class="btn">Importer</button>
+      <button id="btnExport" class="btn ghost">Eksporter</button>
+      <button id="btnLogin" class="btn">Logg inn</button>
+      <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
+    </div>
   </header>
 
-  <!-- Din eksisterende MAIN/UI holdes uendret -->
-  <main style="padding:18px">
-    <!-- … resten av siden … -->
-  </main>
+  <div class="container">
+    <main>
+      <!-- TOPP: Registrering + Graf -->
+      <section class="span-12 top-grid">
+        <!-- Registrering -->
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">Registrering</h2>
+            <div class="row">
+              <label style="gap:4px">Dato
+                <input id="dateInput" class="input" type="date" />
+              </label>
+              <div class="row" style="gap:6px">
+                <button id="btnPrev" class="btn" title="Forrige dag">◀︎</button>
+                <button id="btnNext" class="btn" title="Neste dag">▶︎</button>
+              </div>
+              <div class="popover">
+                <button id="btnCal" class="btn">Kalender</button>
+                <div id="calPanel" class="popover-panel" style="display:none">
+                  <div class="row" style="justify-content:space-between">
+                    <button id="calPrev" class="btn">‹</button>
+                    <div id="calTitle" style="font-weight:600"></div>
+                    <button id="calNext" class="btn">›</button>
+                  </div>
+                  <div class="cal" id="calGrid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="todaySummary" class="list" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Graf (mer plass) -->
+        <div class="card">
+          <div class="row" style="justify-content:space-between; align-items:baseline">
+            <h2 style="margin:0">Graf</h2>
+            <div class="row">
+              <label>Periode
+                <select id="period" class="select">
+                  <option value="14d">14 dager</option>
+                  <option value="30d">30 dager</option>
+                  <option value="365d">1 år</option>
+                  <option value="all">Alt</option>
+                </select>
+              </label>
+              <label>Akse
+                <select id="axisMap" class="select">
+                  <option value="auto">Auto</option>
+                  <option value="manual">Manuell</option>
+                </select>
+              </label>
+              <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:20px">
+                <input type="checkbox" id="showGoals" /> Mål-linjer
+              </label>
+            </div>
+          </div>
+          <canvas id="chart" height="180"></canvas>
+          <div id="legend" class="legend"></div>
+          <div class="small muted">Kun tallfelt vises i grafen</div>
+        </div>
+      </section>
+
+      <!-- Feltbygger -->
+      <section class="card span-12">
+        <h2 style="margin:0 0 8px 0">Felt</h2>
+        <div class="row" style="margin-bottom:10px">
+          <label style="min-width:200px">Navn
+            <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" />
+          </label>
+          <label>Type
+            <select id="f_type" class="select">
+              <option value="number">Tall</option>
+              <option value="boolean">Av/på (checkbox)</option>
+              <option value="text">Tekst</option>
+            </select>
+          </label>
+          <label>Mål (valgfritt, kun tall)
+            <input id="f_goal" class="input" type="number" step="any" inputmode="decimal" placeholder="f.eks. 30" />
+          </label>
+          <label style="margin-top:22px; flex-direction:row; align-items:center; gap:8px">
+            <input id="f_include" type="checkbox" /> Ta med i fremdrift (valgfritt)
+          </label>
+        </div>
+        <div class="row">
+          <button id="btnAddField" class="btn primary">Legg til felt</button>
+          <button id="btnPresets" class="btn">Forhåndsoppsett</button>
+          <button id="btnDeleteAll" class="btn danger">Slett alt</button>
+        </div>
+        <div id="fieldsList" class="list" style="margin-top:14px"></div>
+      </section>
+
+      <!-- 14 dager kompakt -->
+      <section class="card span-12">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Siste 14 dager</h2>
+          <button id="btnToggleHistory" class="btn">Utvid</button>
+        </div>
+        <div id="streak" class="streak" style="margin:8px 0"></div>
+        <div id="miniCards" class="grid-2"></div>
+        <div id="history14" class="list" style="margin-top:10px"></div>
+      </section>
+    </main>
+  </div>
 
   <input id="fileInput" type="file" accept="application/json" style="display:none" />
+
+  <!-- Tema-bygger -->
+  <div id="themeSheet" class="sheet">
+    <h3>Tema-bygger</h3>
+    <div class="grid-2">
+      <label>Accent <input id="th_accent" type="color" class="input" value="#5aa7ff"></label>
+      <label>Bakgrunn <input id="th_bg" type="color" class="input" value="#0b0d10"></label>
+      <label>Kort <input id="th_card" type="color" class="input" value="#11151a"></label>
+      <label>Tekst <input id="th_text" type="color" class="input" value="#e7e7e7"></label>
+      <label>Border <input id="th_border" type="color" class="input" value="#1d232c"></label>
+      <label>Radius <input id="th_radius" type="range" min="6" max="22" value="14" class="input"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="th_preset_nord" class="btn">Nord</button>
+      <button id="th_preset_emerald" class="btn">Emerald</button>
+      <button id="th_preset_rose" class="btn">Rose</button>
+      <div style="flex:1"></div>
+      <button id="th_reset" class="btn danger">Reset</button>
+      <button id="th_close" class="btn primary">Lukk</button>
+    </div>
+  </div>
 
   <script>
     /* ========= Firebase config ========= */
     const FIREBASE_CONFIG = {
-      apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
-      authDomain: "livstracker.firebaseapp.com",
-      projectId: "livstracker",
-      storageBucket: "livstracker.firebasestorage.app",
-      messagingSenderId: "885451038080",
-      appId: "1:885451038080:web:3df131af07a258a5bc7565"
+      apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
+      authDomain:"livstracker.firebaseapp.com",
+      projectId:"livstracker",
+      storageBucket:"livstracker.firebasestorage.app",
+      messagingSenderId:"885451038080",
+      appId:"1:885451038080:web:3df131af07a258a5bc7565"
     };
 
-    /* ========= Minimal app state (forkortet) ========= */
-    let state={uid:null};
-    let fb   ={enabled:false, app:null, auth:null, db:null};
+    /* ========= Tema / tetthet / temabygger ========= */
+    (function(){
+      const root=document.documentElement, TK='lt_theme', DK='lt_density', SK='lt_theme_custom';
+      const setT=v=>{root.setAttribute('data-theme',v); localStorage.setItem(TK,v);};
+      const setD=v=>{root.setAttribute('data-density',v); localStorage.setItem(DK,v);};
+      const applyCustom=(cfg)=>{ if(!cfg)return; for(const[k,v] of Object.entries(cfg)){ root.style.setProperty(`--${k}`,v) } if(cfg.radius) root.style.setProperty('--radius',cfg.radius+'px'); };
+      setT(localStorage.getItem(TK)||'auto'); setD(localStorage.getItem(DK)||'comfortable'); applyCustom(JSON.parse(localStorage.getItem(SK)||'{}'));
+      window.addEventListener('DOMContentLoaded', ()=>{
+        const bt=document.getElementById('btnTheme'), bd=document.getElementById('btnDensity'), sheet=document.getElementById('themeSheet');
+        bt.onclick=()=>{ sheet.style.display = sheet.style.display==='none'||!sheet.style.display ? 'block':'none'; };
+        bd.onclick=()=>{ const c=root.getAttribute('data-density'); const n=c==='comfortable'?'compact':'comfortable'; setD(n); bd.textContent='Tetthet: '+(n==='compact'?'Kompakt':'Komfort'); };
+        bt.textContent='Tema'; bd.textContent='Tetthet: '+(root.getAttribute('data-density')==='compact'?'Kompakt':'Komfort');
+        const picks={accent:'th_accent',bg:'th_bg',card:'th_card',text:'th_text',border:'th_border'}; const radius=document.getElementById('th_radius');
+        const save=()=>{ const cfg={}; for(const[k,id] of Object.entries(picks)){ cfg[k]=document.getElementById(id).value } cfg.radius=Number(radius.value); localStorage.setItem(SK,JSON.stringify(cfg)); applyCustom(cfg); renderChart(); };
+        for(const id of Object.values(picks)) document.getElementById(id).oninput=save; radius.oninput=save;
+        document.getElementById('th_reset').onclick=()=>{ localStorage.removeItem(SK); document.documentElement.style.cssText=''; renderChart(); };
+        document.getElementById('th_close').onclick=()=>{ sheet.style.display='none'; };
+        document.getElementById('th_preset_nord').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#88c0d0', bg:'#2e3440', card:'#3b4252', text:'#e5e9f0', border:'#434c5e', radius:14})); applyCustom(JSON.parse(localStorage.getItem(SK))); renderChart(); };
+        document.getElementById('th_preset_emerald').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#10b981', bg:'#061a14', card:'#0b2a20', text:'#e5fff6', border:'#164036', radius:14})); applyCustom(JSON.parse(localStorage.getItem(SK))); renderChart(); };
+        document.getElementById('th_preset_rose').onclick=()=>{ localStorage.setItem(SK, JSON.stringify({accent:'#fb7185', bg:'#170b0d', card:'#1f0f12', text:'#ffe5e9', border:'#3a1b21', radius:16})); applyCustom(JSON.parse(localStorage.getItem(SK))); renderChart(); };
+      });
+    })();
 
-    const syncStatus=document.getElementById('syncStatus');
-    const netEl=document.getElementById('net');
+    /* ========= Utils ========= */
+    const todayISO=()=>new Date().toISOString().slice(0,10);
+    const iso=d=>new Date(d).toISOString().slice(0,10);
+    const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}
+    const lastNDates=n=>{const out=[]; const base=new Date(); for(let i=0;i<n;i++) out.push(iso(addDays(base,-i))); return out;}
+    const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-    /* ========= Robust SDK-wait ========= */
-    function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-    async function waitForFirebase(maxTries=120){ // ~6s total
-      while(!window.firebase && maxTries--){ await sleep(50); }
-      if(!window.firebase) throw new Error("Firebase SDK lastet ikke");
-    }
+    /* ========= IndexedDB ========= */
+    const DB_NAME='livstracker', DB_VERSION=1; let db;
+    function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
+      rq.onupgradeneeded=()=>{const d=rq.result; if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'}); if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});};
+      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
+    });}
+    const idbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
+    const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite'); tx.objectStore(s).put(v); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
+    const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite'); tx.objectStore(s).delete(k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
 
-    /* ========= Firebase init + redirect-result ========= */
-    async function initFirebase(){
+    /* ========= App-state ========= */
+    let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[], currentDate:todayISO(), historyExpanded:false };
+
+    /* ========= Firebase (robust init) ========= */
+    let fb={enabled:false, app:null, auth:null, db:null};
+    async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
+    async function tryInitFirebase(){
+      if(!FIREBASE_CONFIG?.apiKey) return;
       await waitForFirebase();
       fb.app  = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
       fb.auth = firebase.auth();
@@ -78,90 +291,435 @@
       fb.auth.useDeviceLanguage();
       await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-      // Viktig: fullfør eventuelt redirect-flow før vi binder UI
-      try {
-        const rr = await fb.auth.getRedirectResult();
-        if (rr && rr.user) {
-          // valgfritt: rr.credential?.accessToken
-          console.info("Redirect login OK:", rr.user.uid);
-        }
-      } catch (e) {
-        // Why: disse skjer ofte på iOS/Safari uten 3rd-party cookies
-        console.warn("Redirect-resultat feilet:", e?.code, e?.message);
-      }
+      try { await fb.auth.getRedirectResult(); } catch(e){ console.warn("getRedirectResult:", e?.code, e?.message); }
+      try { await fb.db.enablePersistence({ synchronizeTabs:true }); } catch(e) {}
     }
-
-    /* ========= Login / Logout ========= */
     async function signIn(){
-      if(!fb.enabled){ alert("Firebase ikke konfigurert."); return; }
+      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
       const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-
+      provider.setCustomParameters({ prompt:'select_account' });
       try {
         await fb.auth.signInWithPopup(provider);
-      } catch (e) {
-        const code = e?.code || "";
-        // Fallback til redirect på kjente popup/cookie-feil
-        const shouldRedirect =
-          code.includes("popup") ||
-          code.includes("operation-not-supported") ||
-          code.includes("web-storage-unsupported") ||
-          code.includes("third-party-cookie") ||
-          code.includes("auth/unauthorized-domain");
-        if (shouldRedirect) {
-          await fb.auth.signInWithRedirect(provider);
-          return;
+      } catch(e) {
+        const code=e?.code||'';
+        if(code.includes('popup') || code.includes('operation-not-supported') || code.includes('web-storage-unsupported') || code.includes('third-party-cookie') || code.includes('auth/unauthorized-domain')){
+          await fb.auth.signInWithRedirect(provider); return;
         }
-        // Andre feil → vis kort melding
-        console.error("Login-feil:", code, e?.message);
-        alert(`Kunne ikke logge inn (${code}). Prøv igjen eller bruk redirect.`);
+        alert(`Login-feil: ${code || ''} ${e?.message || e}`);
       }
     }
-    async function signOut(){
-      try { if(fb.enabled) await fb.auth.signOut(); } catch(e){ console.warn(e); }
+    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); } catch(e){} }
+
+    // synk
+    let unsubFields=null, unsubEntries=null, firstUploaded=false;
+    async function collectionHasAny(uid){
+      const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
+      const e=await fb.db.collection('users').doc(uid).collection('entries').limit(1).get();
+      return !f.empty || !e.empty;
+    }
+    async function uploadAllLocal(uid){
+      const batch=fb.db.batch(); const u=fb.db.collection('users').doc(uid);
+      state.fields.forEach(f=>batch.set(u.collection('fields').doc(f.id), {...f,updatedAt:Date.now()},{merge:true}));
+      Object.entries(state.entries).forEach(([date,values])=>batch.set(u.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true}));
+      await batch.commit();
+    }
+    async function startSync(uid){
+      if(!firstUploaded){ if(!await collectionHasAny(uid)) await uploadAllLocal(uid); firstUploaded=true; }
+      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
+
+      unsubFields = fb.db.collection('users').doc(uid).collection('fields')
+        .onSnapshot(async snap=>{
+          const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v);});
+          state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
+          for(const f of state.fields) await idbSet('fields', f);
+          renderAll();
+        });
+
+      unsubEntries = fb.db.collection('users').doc(uid).collection('entries')
+        .onSnapshot(async snap=>{
+          const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
+          state.entries=all;
+          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+          renderAll();
+        });
+    }
+    async function pushField(f){
+      await idbSet('fields', f);
+      if(fb.enabled && state.uid){
+        await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id).set({...f,updatedAt:Date.now()},{merge:true});
+      }
+    }
+    async function deleteField(id){
+      state.fields=state.fields.filter(f=>f.id!==id);
+      await idbDelete('fields', id);
+      if(fb.enabled && state.uid){
+        await fb.db.collection('users').doc(state.uid).collection('fields').doc(id).delete().catch(()=>{});
+      }
+      for(const [d,vals] of Object.entries(state.entries)){ if(id in vals){ delete vals[id]; await pushEntry(d, vals); } }
+      renderAll();
+    }
+    async function pushEntry(date, values){
+      await idbSet('entries', {date,values,updatedAt:Date.now()});
+      if(fb.enabled && state.uid){
+        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date).set({date,values,updatedAt:Date.now()},{merge:true});
+      }
     }
 
-    /* ========= Bind UI ========= */
-    function bindHeader(){
-      document.getElementById('btnLogin').onclick=signIn;
-      document.getElementById('btnLogout').onclick=signOut;
-
-      const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');};
-      window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
+    /* ========= Graf ========= */
+    function dateRange(period){ if(period==='all')return null; const map={'14d':14,'30d':30,'365d':365}; return addDays(new Date(),-map[period]); }
+    function groupKey(d,mode){ const x=new Date(d); if(mode==='week'){ const day=(x.getUTCDay()+6)%7; const monday=new Date(Date.UTC(x.getUTCFullYear(),x.getUTCMonth(),x.getUTCDate()-day)); return monday.toISOString().slice(0,10);} return iso(x); }
+    function pickAxis(field){
+      if(state.axisMapMode==='manual' && field.axisHint) return field.axisHint==='left'?'y':'y1';
+      const n=(field.name||'').toLowerCase();
+      if(n.includes('score')||n.includes('%')) return 'y';
+      if(n.includes('time')||n.includes('timer')||n.includes('min')||n.includes('trening')) return 'y1';
+      return (typeof field.goal==='number' && field.goal>10)?'y':'y1';
     }
+    let chart;
+    function buildDatasets(dates, fields, matrix, showGoals){
+      const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
+      const ds=[]; const seen=new Set();
+      fields.forEach((f,idx)=>{
+        if(f.type!=='number'||seen.has(f.id)) return; seen.add(f.id);
+        const raw=dates.map(d=>(matrix[d]&&typeof matrix[d][f.id]!=='undefined')?Number(matrix[d][f.id]):null);
+        const axis=pickAxis(f);
+        ds.push({label:f.name,data:raw,yAxisID:axis,borderColor:colors[idx%colors.length],backgroundColor:colors[idx%colors.length]+'33',pointRadius:0,tension:.25});
+        if(showGoals && typeof f.goal==='number'){ ds.push({label:f.name+' mål',data:dates.map(()=>f.goal),yAxisID:axis,borderColor:colors[idx%colors.length],borderDash:[6,6],pointRadius:0,tension:0}); }
+      });
+      return ds;
+    }
+    function renderChart(){
+      const period=periodEl.value, showGoals=showGoalsEl.checked;
+      const since=dateRange(period);
+      const autoGrouping=(period==='365d'||period==='all')?'week':'day';
+      const datesAll=Object.keys(state.entries).sort();
+      const dates=datesAll.filter(d=>!since || new Date(d)>=since);
 
-    /* ========= Auth state UI ========= */
-    function hookAuthListener(){
-      if(!fb.enabled) return;
-      fb.auth.onAuthStateChanged(async (user)=>{
-        if(user){
-          state.uid=user.uid;
-          syncStatus.textContent='Pålogget';
-          document.getElementById('btnLogout').style.display='inline-block';
-          document.getElementById('btnLogin').style.display='none';
-          // her kan du starte Firestore-synk (uendret fra før)
-        } else {
-          state.uid=null;
-          syncStatus.textContent='Ikke pålogget';
-          document.getElementById('btnLogout').style.display='none';
-          document.getElementById('btnLogin').style.display='inline-block';
-          // stopp evt. listeners (uendret fra før)
+      const groups={};
+      for(const d of dates){
+        const g=groupKey(d,autoGrouping); groups[g]??={};
+        const vals=state.entries[d]||{};
+        state.fields.forEach(f=>{ const v=vals[f.id]; if(typeof v==='undefined') return; (groups[g][f.id]??=[]).push(f.type==='number'?Number(v):null); });
+      }
+      const labels=Object.keys(groups).sort();
+      const matrix={}; for(const g of labels){ matrix[g]={}; state.fields.forEach(f=>{ if(f.type!=='number'){ matrix[g][f.id]=null; return; } const arr=(groups[g][f.id]||[]).filter(v=>typeof v==='number'); matrix[g][f.id]=arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null; }); }
+
+      const selected=state.selectedFields.length?new Set(state.selectedFields):new Set(state.fields.filter(f=>f.type==='number').map(f=>f.id));
+      const fields=state.fields.filter(f=>selected.has(f.id));
+
+      if(chart) chart.destroy();
+      const cs=getComputedStyle(document.documentElement);
+      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:buildDatasets(labels,fields,matrix,showGoals)},options:{
+        responsive:true,animation:false,interaction:{mode:'nearest',intersect:false},
+        plugins:{legend:{display:true,position:'bottom'}},
+        scales:{
+          y:{type:'linear',position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border').trim()},ticks:{color:cs.getPropertyValue('--muted').trim()}},
+          y1:{type:'linear',position:'right',min:0,max:10, grid:{drawOnChartArea:false},ticks:{color:cs.getPropertyValue('--muted').trim()}},
+          x:{grid:{color:cs.getPropertyValue('--border').trim()},ticks:{color:cs.getPropertyValue('--muted').trim()}}
         }
+      }});
+
+      legendEl.innerHTML='';
+      state.fields.filter(f=>f.type==='number').forEach(f=>{
+        const row=document.createElement('div'); row.className='item';
+        row.innerHTML=`<div class="grow"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="muted small">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`;
+        row.querySelector('button').onclick=()=>{ const i=chart.data.datasets.findIndex(d=>d.label===f.name); const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål'); if(i>=0) chart.toggleDataVisibility(i); if(gi>=0) chart.toggleDataVisibility(gi); chart.update(); };
+        legendEl.appendChild(row);
       });
     }
 
-    /* ========= Boot ========= */
-    window.addEventListener('load', async ()=>{
-      try {
-        bindHeader();
-        await initFirebase();
-        hookAuthListener();
-      } catch (e) {
-        console.error(e);
-        alert("Klarte ikke starte Firebase. Last siden på nytt.");
+    /* ========= UI refs ========= */
+    const syncStatus=document.getElementById('syncStatus');
+    const netEl=document.getElementById('net');
+
+    // graf
+    const chartCtx=document.getElementById('chart').getContext('2d');
+    const legendEl=document.getElementById('legend');
+    const periodEl=document.getElementById('period');
+    const axisEl=document.getElementById('axisMap');
+    const showGoalsEl=document.getElementById('showGoals');
+
+    // registrering
+    const todaySummary=document.getElementById('todaySummary');
+    const dateInput=document.getElementById('dateInput');
+    const btnPrev=document.getElementById('btnPrev');
+    const btnNext=document.getElementById('btnNext');
+
+    // kalender
+    const calPanel=document.getElementById('calPanel'), calGrid=document.getElementById('calGrid'), calTitle=document.getElementById('calTitle');
+    let calMonth = new Date();
+
+    // felt
+    const f_name=document.getElementById('f_name');
+    const f_type=document.getElementById('f_type');
+    const f_goal=document.getElementById('f_goal');
+    const f_include=document.getElementById('f_include');
+    const fieldsList=document.getElementById('fieldsList');
+
+    // 14d
+    const streakEl=document.getElementById('streak');
+    const miniCards=document.getElementById('miniCards');
+    const history14=document.getElementById('history14');
+    const btnToggleHistory=document.getElementById('btnToggleHistory');
+
+    /* ========= App helpers ========= */
+    const getEntry = (date)=> state.entries[date] || {};
+    async function setEntryValue(date, fieldId, value){
+      const cur={...getEntry(date), [fieldId]: value};
+      state.entries[date]=cur; await pushEntry(date, cur);
+      renderToday(); renderChart(); renderHistory14();
+    }
+    async function upsertField({id,name,type,goal,includeInProgress,axisHint}){
+      const f={id:id||uid(), name:name?.trim()||'Uten navn', type:type||'number',
+        goal: (type==='number' && goal!=='') ? Number(goal) : undefined,
+        includeInProgress: !!includeInProgress,
+        axisHint: axisHint|| (type==='number'?'right':undefined),
+        updatedAt: Date.now()
+      };
+      const i=state.fields.findIndex(x=>x.id===f.id); if(i>=0) state.fields[i]={...state.fields[i],...f}; else state.fields.push(f);
+      await pushField(i>=0?state.fields[i]:f); renderAll();
+    }
+
+    function segToggle(val, onChange){
+      const el=document.createElement('div'); el.className='seg';
+      const off=document.createElement('button'); off.textContent='Av'; off.setAttribute('aria-pressed', String(!val));
+      const on=document.createElement('button'); on.textContent='På'; on.setAttribute('aria-pressed', String(!!val));
+      const set=(v)=>{ on.setAttribute('aria-pressed', String(!!v)); off.setAttribute('aria-pressed', String(!v)); onChange(v); }
+      off.onclick=()=>set(false); on.onclick=()=>set(true);
+      el.append(off,on); return el;
+    }
+
+    function renderFieldList(){
+      fieldsList.innerHTML='';
+      state.fields.forEach(f=>{
+        const wrap=document.createElement('div'); wrap.className='item';
+        wrap.innerHTML=`
+          <div class="grow">
+            <div><strong>${f.name}</strong> <span class="muted small">• ${f.type}${typeof f.goal==='number' ? ` • mål: ${f.goal}`:''}${f.includeInProgress?` • i fremdrift`:''}</span></div>
+            <div class="row" style="margin-top:6px">
+              <input class="input" value="${f.name}" data-k="name" style="min-width:180px">
+              <select class="select" data-k="type">
+                <option value="number" ${f.type==='number'?'selected':''}>Tall</option>
+                <option value="boolean" ${f.type==='boolean'?'selected':''}>Av/på (checkbox)</option>
+                <option value="text" ${f.type==='text'?'selected':''}>Tekst</option>
+              </select>
+              <input class="input" type="number" step="any" inputmode="decimal" placeholder="mål (valgfritt)" value="${typeof f.goal==='number'?f.goal:''}" data-k="goal" style="width:140px">
+              <label style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" ${f.includeInProgress?'checked':''} data-k="includeInProgress"> I fremdrift</label>
+              <button class="btn" data-act="save">Oppdater</button>
+            </div>
+          </div>
+          <button class="btn danger" data-act="delete">Fjern</button>
+        `;
+        wrap.querySelector('[data-act="save"]').onclick=async ()=>{
+          const name=wrap.querySelector('[data-k="name"]').value;
+          const type=wrap.querySelector('[data-k="type"]').value;
+          const goal=wrap.querySelector('[data-k="goal"]').value;
+          const includeInProgress=wrap.querySelector('[data-k="includeInProgress"]').checked;
+          await upsertField({id:f.id,name,type,goal,includeInProgress});
+        };
+        wrap.querySelector('[data-act="delete"]').onclick=()=>deleteField(f.id);
+        fieldsList.appendChild(wrap);
+      });
+    }
+
+    function renderCalendar(){
+      const y=calMonth.getFullYear(), m=calMonth.getMonth();
+      calTitle.textContent = calMonth.toLocaleDateString('no-NO',{month:'long', year:'numeric'});
+      const first=new Date(Date.UTC(y,m,1)), start=((first.getUTCDay()+6)%7);
+      const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+      const prevDays=new Date(Date.UTC(y,m,0)).getUTCDate();
+      calGrid.innerHTML='';
+      ['ma','ti','on','to','fr','lø','sø'].forEach(d=>{ const h=document.createElement('div'); h.className='hd'; h.textContent=d; calGrid.appendChild(h); });
+      const total=42;
+      for(let i=0;i<total;i++){
+        const cell=document.createElement('button');
+        let day, dateStr, muted=false;
+        if(i<start){ day=prevDays-start+i+1; const dt=new Date(Date.UTC(y,m-1,day)); dateStr=dt.toISOString().slice(0,10); muted=true; }
+        else if(i>=start+daysInMonth){ day=i-(start+daysInMonth)+1; const dt=new Date(Date.UTC(y,m+1,day)); dateStr=dt.toISOString().slice(0,10); muted=true; }
+        else { day=i-start+1; const dt=new Date(Date.UTC(y,m,day)); dateStr=dt.toISOString().slice(0,10); }
+        cell.textContent=String(day); if(muted) cell.classList.add('muted-day');
+        if(dateStr===state.currentDate) cell.classList.add('sel');
+        cell.onclick=()=>{ state.currentDate=dateStr; dateInput.value=state.currentDate; calPanel.style.display='none'; renderToday(); renderHistory14(); renderChart(); };
+        calGrid.appendChild(cell);
       }
-      // … kall dine øvrige boot-funksjoner her (render, idb, osv.) …
-    });
+    }
+
+    function renderToday(){
+      dateInput.value = state.currentDate;
+      todaySummary.innerHTML='';
+      const date=state.currentDate;
+      const values=getEntry(date);
+
+      state.fields.forEach(f=>{
+        const row=document.createElement('div'); row.className='item';
+        const val = values[f.id];
+        let ctrl;
+        if(f.type==='number'){
+          ctrl = document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value = (val??'');
+          ctrl.oninput = () => setEntryValue(date, f.id, ctrl.value===''?null:Number(ctrl.value));
+        } else if(f.type==='boolean'){
+          ctrl = segToggle(!!val, v => setEntryValue(date, f.id, v));
+        } else {
+          ctrl = document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='f.eks. 3 ting jeg er takknemlig for…'; ctrl.style.minWidth='240px'; ctrl.value = val??'';
+          let t; const commit=()=>{ clearTimeout(t); t=setTimeout(()=>setEntryValue(date,f.id,ctrl.value),200); }; ctrl.oninput=commit; ctrl.onchange=commit;
+        }
+        row.appendChild(Object.assign(document.createElement('div'),{className:'grow', innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}</span>`}));
+        const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap);
+        todaySummary.appendChild(row);
+      });
+    }
+
+    function renderHistory14(){
+      const dates=lastNDates(14).reverse();
+      // streak
+      streakEl.innerHTML='';
+      dates.forEach(d=>{
+        const vals=getEntry(d); let score=0,max=0;
+        state.fields.filter(f=>f.type==='number' && typeof f.goal==='number' && f.includeInProgress).forEach(f=>{ max++; const v=Number(vals[f.id]||0); if(v>=f.goal) score++; });
+        const dot=document.createElement('div'); dot.className='dot';
+        if(max===0){} else if(score===0) dot.classList.add('bad'); else if(score<max) dot.classList.add('mid'); else dot.classList.add('ok');
+        dot.title=new Date(d).toLocaleDateString('no-NO')+` – mål ${score}/${max}`;
+        streakEl.appendChild(dot);
+      });
+
+      // mini-kort per tallfelt: 14d snitt
+      miniCards.innerHTML='';
+      state.fields.filter(f=>f.type==='number').forEach(f=>{
+        const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
+        const avg=vs.length? (vs.reduce((a,b)=>a+b,0)/vs.length) : null;
+        const el=document.createElement('div'); el.className='item'; el.innerHTML=`<div class="grow"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div class="kpi">${avg!==null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`;
+        miniCards.appendChild(el);
+      });
+
+      // liste: 3 siste, resten via “Utvid”
+      history14.innerHTML='';
+      const selected=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse();
+      selected.forEach(d=>{
+        const vals=getEntry(d);
+        const filled = Object.entries(vals).filter(([id,v])=>v!==null && v!=='' && v!==undefined);
+        if(!filled.length) return;
+        const wrap=document.createElement('div'); wrap.className='item';
+        const title=new Date(d).toLocaleDateString('no-NO',{weekday:'short', day:'2-digit', month:'short'});
+        const parts=filled.map(([id,v])=>{
+          const f=state.fields.find(x=>x.id===id); if(!f) return '';
+          if(f.type==='text') return `<div class="small muted"><b>${f.name}:</b> ${String(v).slice(0,100)}</div>`;
+          if(f.type==='boolean') return `<span class="small"><b>${f.name}:</b> ${v?'På':'Av'}</span>`;
+          return `<span class="small"><b>${f.name}:</b> ${v}${typeof f.goal==='number'?` / ${f.goal}`:''}</span>`;
+        }).join(' • ');
+        wrap.innerHTML=`<div class="grow"><b>${title}</b><div class="muted small">${parts}</div></div><button class="btn small" data-open="${d}">Åpne</button>`;
+        wrap.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
+        history14.appendChild(wrap);
+      });
+
+      btnToggleHistory.textContent = state.historyExpanded ? 'Skjul' : 'Utvid';
+    }
+
+    /* ========= Bindings ========= */
+    function bindUI(){
+      // import/eksport
+      document.getElementById('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url); };
+      document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
+      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ const data=JSON.parse(t); const byId=new Map(state.fields.map(f=>[f.id,f])); (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()})); state.fields=[...byId.values()]; for(const f of state.fields) pushField(f); for(const [d,vals] of Object.entries(data.entries||{})) pushEntry(d, vals); renderAll(); });};
+
+      // nett + auth
+      document.getElementById('btnLogin').onclick=signIn; document.getElementById('btnLogout').onclick=signOut;
+      const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');};
+      window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
+
+      // felt
+      document.getElementById('btnAddField').onclick=async ()=>{ await upsertField({name:f_name.value, type:f_type.value, goal:f_goal.value, includeInProgress:f_include.checked}); f_name.value=''; f_goal.value=''; f_include.checked=false; };
+      document.getElementById('btnPresets').onclick=async ()=>{
+        const presets=[
+          {name:'Søvn (timer)', type:'number', goal:8, includeInProgress:true, axisHint:'right'},
+          {name:'Søvnscore %', type:'number', goal:80, includeInProgress:true, axisHint:'left'},
+          {name:'Trening (min)', type:'number', goal:30, includeInProgress:true, axisHint:'right'},
+          {name:'Takknemlighet', type:'text'},
+          {name:'Alkoholfri dag', type:'boolean', includeInProgress:true}
+        ];
+        for(const p of presets) await upsertField(p);
+      };
+      document.getElementById('btnDeleteAll').onclick=async ()=>{
+        if(!confirm('Slette alle felt og data?')) return;
+        const fs=[...state.fields]; for(const f of fs) await deleteField(f.id);
+        for(const d of Object.keys(state.entries)){ await pushEntry(d, {}); delete state.entries[d]; }
+        renderAll();
+      };
+
+      // graf
+      periodEl.onchange=renderChart; axisEl.onchange=e=>{ state.axisMapMode=e.target.value; renderChart(); }; showGoalsEl.onchange=renderChart;
+
+      // dato
+      dateInput.onchange=()=>{ state.currentDate=dateInput.value; renderToday(); renderHistory14(); renderChart(); }
+      btnPrev.onclick=()=>{ state.currentDate=iso(addDays(state.currentDate,-1)); dateInput.value=state.currentDate; renderToday(); renderHistory14(); renderChart(); }
+      btnNext.onclick=()=>{ state.currentDate=iso(addDays(state.currentDate, 1)); dateInput.value=state.currentDate; renderToday(); renderHistory14(); renderChart(); }
+
+      // kalender
+      document.getElementById('btnCal').onclick=()=>{ calPanel.style.display = calPanel.style.display==='none' || !calPanel.style.display ? 'block' : 'none'; renderCalendar(); };
+      document.getElementById('calPrev').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(), calMonth.getUTCMonth()-1, 1)); renderCalendar(); };
+      document.getElementById('calNext').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(), calMonth.getUTCMonth()+1, 1)); renderCalendar(); };
+      document.addEventListener('click', (e)=>{ if(!document.getElementById('btnCal').contains(e.target) && !calPanel.contains(e.target)) calPanel.style.display='none'; });
+
+      // 14d toggle
+      btnToggleHistory.onclick=()=>{ state.historyExpanded = !state.historyExpanded; renderHistory14(); };
+    }
+
+    function renderAll(){ renderFieldList(); renderToday(); renderChart(); renderHistory14(); }
+
+    /* ========= Boot ========= */
+    async function boot(){
+      await idbOpen();
+      const fieldsArr=await idbGetAll('fields'); state.fields=[...new Map(fieldsArr.map(f=>[f.id,f])).values()];
+      const entriesArr=await idbGetAll('entries'); state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
+
+      await tryInitFirebase();
+      bindUI();
+
+      if(fb.enabled){
+        fb.auth.onAuthStateChanged(async (user)=>{
+          if(user){
+            state.uid=user.uid;
+            syncStatus.textContent='Pålogget';
+            document.getElementById('btnLogout').style.display='inline-block';
+            document.getElementById('btnLogin').style.display='none';
+            await startSync(user.uid);
+          } else {
+            state.uid=null;
+            syncStatus.textContent='Ikke pålogget';
+            document.getElementById('btnLogout').style.display='none';
+            document.getElementById('btnLogin').style.display='inline-block';
+            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
+          }
+        });
+      } else {
+        syncStatus.textContent='Kun lokal lagring';
+      }
+
+      state.currentDate = todayISO();
+      renderAll();
+    }
+
+    async function ensureDemo(){
+      if(state.fields.length) return;
+      await upsertField({id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8, includeInProgress:true, axisHint:'right'});
+      await upsertField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true, axisHint:'left'});
+      await upsertField({id:'workout_min',name:'Trening (min)',type:'number',goal:30,includeInProgress:true, axisHint:'right'});
+      await upsertField({id:'gratitude',name:'Takknemlighet',type:'text'});
+      await upsertField({id:'no_alcohol',name:'Alkoholfri dag',type:'boolean',includeInProgress:true});
+      const base=todayISO();
+      for(let i=0;i<21;i++){
+        const d=iso(addDays(base,-i));
+        await pushEntry(d,{
+          sleep_score:Math.round(80+(Math.random()*20-10)),
+          sleep_hours:Math.round((7+(Math.random()*4-2))*2)/2,  // 0.5-trinn
+          workout_min:Math.max(0,Math.round(20+(Math.random()*20-10))),
+          gratitude:(Math.random()>0.6)?"familie • frisk luft • god kaffe":"",
+          no_alcohol: Math.random()>0.3
+        });
+      }
+      renderAll();
+    }
+
+    window.addEventListener('load', ()=>{ boot().then(ensureDemo); });
   </script>
 </body>
 </html>
