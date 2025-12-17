@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Livstracker</title>
 
-  <!-- Libs -->
+  <!-- Prefers CDN, men vi har også dynamisk fallback i JS -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
@@ -102,10 +102,10 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none"/>
 
   <script>
-    // ---------- CONFIG ----------
+    // ===== Config =====
     const FIREBASE_CONFIG={apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",authDomain:"livstracker.firebaseapp.com",projectId:"livstracker",storageBucket:"livstracker.firebasestorage.app",messagingSenderId:"885451038080",appId:"1:885451038080:web:3df131af07a258a5bc7565"};
 
-    // ---------- UTILS ----------
+    // ===== Utils =====
     const $=id=>document.getElementById(id);
     const showBar=msg=>{const el=$("authHint");el.textContent=msg;el.style.display="block"};
     const hideBar=()=>$("authHint").style.display="none";
@@ -114,7 +114,7 @@
     const lastNDates=n=>{const out=[],b=new Date();for(let i=0;i<n;i++) out.push(iso(addDays(b,-i)));return out};
     const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
 
-    // ---------- INDEXEDDB ----------
+    // ===== IndexedDB =====
     const DB_NAME='livstracker',DB_VERSION=3;let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
       rq.onupgradeneeded=()=>{const d=rq.result;if(!d.objectStoreNames.contains('fields'))d.createObjectStore('fields',{keyPath:'id'});
@@ -125,14 +125,33 @@
     const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).put(v);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
     const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
 
-    // ---------- STATE ----------
+    // ===== State =====
     let state={fields:[],entries:{},uid:null,axisMapMode:'auto',currentDate:todayISO(),historyExpanded:false};
     const getEntry=d=>state.entries[d]||{};
     const isEmptyVal=(v,t)=>t==='boolean'?v==null:t==='number'?(v===''||v==null||Number.isNaN(v)):t==='text'?(v===''||v==null):v==null;
     const isEmptyEntry=v=>{if(!v)return true;for(const [fid,val] of Object.entries(v)){const f=state.fields.find(x=>x.id===fid);if(!f)continue;if(!isEmptyVal(val,f.type))return false}return true};
 
-    // ---------- FIREBASE / AUTH ----------
+    // ===== Firebase/Auth =====
     let fb={enabled:false,app:null,auth:null,db:null},unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
+    let firebaseReadyPromise=null;
+
+    function loadScript(src){
+      return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.defer=true;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});
+    }
+    async function ensureFirebaseReady(){
+      if(fb.enabled) return;
+      if(firebaseReadyPromise) return firebaseReadyPromise;
+      firebaseReadyPromise = (async ()=>{
+        // SDK fallback hvis blokkert/ikke lastet
+        if(!window.firebase){
+          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js");
+          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js");
+          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js");
+        }
+        await initFirebase(); // idempotent
+      })();
+      return firebaseReadyPromise;
+    }
 
     async function setBestPersistence(auth){
       try{await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);return'LOCAL'}catch{}
@@ -141,13 +160,14 @@
     }
 
     async function initFirebase(){
-      const sdkOk=!!window.firebase; $("sdkChip").textContent="SDK: "+(sdkOk?"ok":"mangler"); if(!sdkOk){showBar("Finner ikke Firebase SDK."); return;}
+      if(fb.enabled) return; // idempotent
+      const sdkOk=!!window.firebase; $("sdkChip").textContent="SDK: "+(sdkOk?"ok":"mangler"); if(!sdkOk){showBar("Firebase SDK mangler."); return;}
       fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
       fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true; fb.auth.useDeviceLanguage();
       const p=await setBestPersistence(fb.auth); $("sdkChip").textContent+=" • "+p;
       try{await fb.db.enablePersistence({synchronizeTabs:true})}catch{}
 
-      // OBSERVER FØR redirect-resultat
+      // Observer FØR redirect-resultat
       fb.auth.onAuthStateChanged(async user=>{
         if(user){
           hideBar(); state.uid=user.uid; $("syncStatus").textContent="Pålogget";
@@ -160,29 +180,42 @@
         }
       });
 
-      // Fullfør redirect (viser bare ekte feil)
+      // Fullfør ev. redirect (vis bare ekte feil)
       try{
         if(sessionStorage.getItem('lt_redirect')==='1'){
           const res=await fb.auth.getRedirectResult();
           sessionStorage.removeItem('lt_redirect');
-          if(!res || !res.user){ showBar("Login returnerte uten bruker. Sjekk Authorized domains og cookies."); }
+          if(!res || !res.user){ showBar("Login returnerte uten bruker. Sjekk Authorized domains + cookies."); }
         }else{
           await fb.auth.getRedirectResult().catch(e=>{if((e?.code||'')!=='auth/no-auth-event')showBar(`Redirect-feil: ${e.code} ${e.message}`)});
         }
       }catch(e){ if((e?.code||'')!=='auth/no-auth-event') showBar(`Redirect-feil: ${e.code} ${e.message}`); }
     }
 
-    async function signIn(){ // redirect-first: mest stabilt
-      if(!fb.enabled) return showBar("Firebase ikke klar");
-      const provider=new firebase.auth.GoogleAuthProvider(); provider.setCustomParameters({prompt:'select_account'});
-      sessionStorage.setItem('lt_redirect','1');
-      try{ await fb.auth.signInWithRedirect(provider); }catch(e){ showBar(`Login-feil: ${e.code||''} ${e.message||''}`); alert(`Login-feil: ${e.code||''}\n${e.message||''}`); }
+    async function signIn(){
+      try{
+        await ensureFirebaseReady(); // <- fikser “Firebase ikke klar”
+        const provider=new firebase.auth.GoogleAuthProvider(); provider.setCustomParameters({prompt:'select_account'});
+        try{
+          await fb.auth.signInWithPopup(provider);
+        }catch(e){
+          const code=e?.code||'';
+          if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')){
+            sessionStorage.setItem('lt_redirect','1');
+            await fb.auth.signInWithRedirect(provider);
+            return false;
+          }
+          showBar(`Login-feil: ${code} ${e?.message||''}`); alert(`Login-feil: ${code}\n${e?.message||''}`);
+        }
+      }catch(err){
+        showBar("Init-feil: "+(err?.message||err)); alert("Init-feil: "+(err?.message||err));
+      }
       return false;
     }
-    window.__login=signIn; // inline fallback
+    window.__login=signIn;
     async function signOut(){ try{ await fb.auth.signOut(); }catch{} }
 
-    // ---------- SYNC (to-veis + tombstones) ----------
+    // ===== Synk (2-veis + tombstones) =====
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -204,6 +237,7 @@
         await u.collection('tombstones').doc(`field_${fieldId}`).set({type:'field',fieldId,deletedAt:Date.now()},{merge:true});
       }
     }
+
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap,esSnap,tsSnap]=await Promise.all([
@@ -242,6 +276,7 @@
       for(const fid of allFieldT) await idbSet('tombstones',{id:`field:${fid}`,type:'field',fieldId:fid,deletedAt:Date.now()});
       for(const date of allEntryT) await idbSet('tombstones',{id:`entry:${date}`,type:'entry',date,deletedAt:Date.now()});
     }
+
     async function startSync(uid){
       if(!firstSynced){ await reconcileAndUpload(uid); firstSynced=true; }
       if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
@@ -251,8 +286,8 @@
       unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{let changed=false; snap.forEach(async d=>{const v=d.data(); if(v.type==='entry'&&v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries',v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); } if(v.type==='field'&&v.fieldId){ if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; } await idbDelete('fields',v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v}); for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } } }}); if(changed) renderAll();});
     }
 
-    // ---------- UI / GRAF ----------
-    const chartCtx=$('chart').getContext('2d'); let chart;
+    // ===== UI / Graf / Registrering (uendret fra forrige fungerende) =====
+    const chartCtx=document.getElementById('chart').getContext('2d'); let chart;
     function pickAxis(f){ if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1'; const n=(f.name||'').toLowerCase(); if(n.includes('score')||n.includes('%'))return'y'; if(n.includes('timer')||n.includes('min')||n.includes('trening'))return'y1'; return (typeof f.goal==='number'&&f.goal>10)?'y':'y1'; }
     function renderChart(){
       const period=$('period').value, since=(period==='all'?null:addDays(new Date(),-({'14d':14,'30d':30,'365d':365}[period])));
@@ -295,11 +330,11 @@
     }
     function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
 
-    // ---------- CRUD ----------
+    // ===== CRUD =====
     async function pushField(f){ const val={...f,updatedAt:f.updatedAt||Date.now()}; await idbSet('fields',val); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('fields').doc(val.id).set(val,{merge:true}); await u.collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{}); await idbDelete('tombstones',`field:${val.id}`);} }
     async function pushEntry(date,values){ if(isEmptyEntry(values)){ await markEntryDeleted(date); renderAll(); return; } const val={date,values,updatedAt:Date.now()}; await idbSet('entries',val); await idbDelete('tombstones',`entry:${date}`); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('entries').doc(date).set(val,{merge:true}); await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});} }
 
-    // ---------- BIND ----------
+    // ===== Bind & Boot =====
     function bindUI(){
       $('btnLogin').addEventListener('click',signIn);
       $('btnLogout').onclick=signOut;
@@ -315,14 +350,15 @@
       $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
     }
 
-    // ---------- BOOT ----------
     window.addEventListener('load', async ()=>{
       await idbOpen();
       const fs=await idbGetAll('fields'); state.fields=[...new Map(fs.map(f=>[f.id,f])).values()];
       const es=await idbGetAll('entries'); state.entries=Object.fromEntries(es.map(x=>[x.date,x.values]));
       $('sdkChip').title='Hvis login ikke fester: sjekk Authorized domains (localhost/127.0.0.1/LAN/Vercel) og cookies';
       bindUI(); state.currentDate=todayISO(); renderAll();
-      await initFirebase(); // etter UI-binding
+
+      // Prøv å initialisere, men login-knappen gjør det uansett ved klikk
+      try{ await ensureFirebaseReady(); }catch(e){ showBar('Init-feil: '+(e?.message||e)); }
     });
 
     /* Firestore Rules (referanse)
