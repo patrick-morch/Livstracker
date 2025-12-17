@@ -2,8 +2,8 @@
 <!doctype html>
 <html lang="no">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Livstracker</title>
 
   <!-- Libs -->
@@ -26,21 +26,22 @@
     .btn.primary{background:var(--accent);border-color:transparent;color:#fff}.btn.ghost{background:transparent}
     .input,.select,textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:10px}
     .item{display:flex;gap:10px;align-items:center;border:1px dashed var(--border);border-radius:10px;padding:8px 10px;background:#0f131a}
-    .seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden}
-    .seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer}
-    .seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+    #authHint{position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;display:none}
   </style>
 </head>
 <body>
+  <div id="authHint"></div>
+
   <header>
     <h1>Livstracker</h1>
-    <span id="net" class="small muted"></span>
-    <span class="muted">·</span>
-    <span id="syncStatus" class="small muted">Ikke pålogget</span>
+    <span id="net" class="small muted"></span><span class="muted">·</span>
+    <span id="syncStatus" class="small muted">Ikke pålogget</span><span class="muted">·</span>
+    <span id="sdkChip" class="small muted">SDK: …</span>
     <div style="flex:1"></div>
     <button id="btnImport" class="btn">Importer</button>
     <button id="btnExport" class="btn ghost">Eksporter</button>
-    <button id="btnLogin" class="btn primary">Logg inn</button>
+    <!-- Inline fallback sikrer at klikk alltid kaller login -->
+    <button id="btnLogin" class="btn primary" onclick="window.__login && window.__login()">Logg inn</button>
     <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
   </header>
 
@@ -50,13 +51,8 @@
         <!-- Registrering -->
         <div>
           <div class="row" style="justify-content:space-between">
-            <label>Dato
-              <input id="dateInput" class="input" type="date" />
-            </label>
-            <div class="row">
-              <button id="btnPrev" class="btn">◀︎</button>
-              <button id="btnNext" class="btn">▶︎</button>
-            </div>
+            <label>Dato <input id="dateInput" class="input" type="date"/></label>
+            <div class="row"><button id="btnPrev" class="btn">◀︎</button><button id="btnNext" class="btn">▶︎</button></div>
           </div>
           <div id="todaySummary" class="list" style="margin-top:10px"></div>
         </div>
@@ -66,32 +62,28 @@
           <div class="row" style="justify-content:flex-end">
             <label>Periode
               <select id="period" class="select">
-                <option value="14d">14 dager</option><option value="30d">30 dager</option><option value="365d">1 år</option><option value="all">Alt</option>
+                <option value="14d">14 dager</option><option value="30d">30 dager</option>
+                <option value="365d">1 år</option><option value="all">Alt</option>
               </select>
             </label>
             <label>Akse
               <select id="axisMap" class="select"><option value="auto">Auto</option><option value="manual">Manuell</option></select>
             </label>
             <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:20px">
-              <input type="checkbox" id="showGoals" /> Mål-linjer
+              <input type="checkbox" id="showGoals"/> Mål-linjer
             </label>
           </div>
           <canvas id="chart" height="170"></canvas>
           <div id="legend" class="list" style="margin-top:8px"></div>
-          <div class="small muted">Kun tallfelt vises i grafen</div>
+          <div class="small muted">Kun tallfelt i grafen</div>
         </div>
       </section>
 
-      <!-- Felt -->
       <section class="card span-12">
         <h2 style="margin:0 0 8px 0">Felt</h2>
         <div class="row" style="margin-bottom:10px">
           <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" style="min-width:220px"/>
-          <select id="f_type" class="select">
-            <option value="number">Tall</option>
-            <option value="boolean">Av/på (checkbox)</option>
-            <option value="text">Tekst</option>
-          </select>
+          <select id="f_type" class="select"><option value="number">Tall</option><option value="boolean">Av/på</option><option value="text">Tekst</option></select>
           <input id="f_goal" class="input" type="number" step="any" inputmode="decimal" placeholder="Mål (valgfritt, tall)"/>
           <label class="small" style="display:flex;align-items:center;gap:8px"><input id="f_include" type="checkbox"/> I fremdrift</label>
           <button id="btnAddField" class="btn">Legg til</button>
@@ -99,62 +91,48 @@
         <div id="fieldsList" class="list"></div>
       </section>
 
-      <!-- 14 dager -->
       <section class="card span-12">
-        <div class="row" style="justify-content:space-between">
-          <h2 style="margin:0">Siste 14 dager</h2>
-          <button id="btnToggleHistory" class="btn">Utvid</button>
-        </div>
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Siste 14 dager</h2><button id="btnToggleHistory" class="btn">Utvid</button></div>
         <div id="miniCards" class="list" style="margin-top:8px"></div>
         <div id="history14" class="list" style="margin-top:10px"></div>
       </section>
     </main>
   </div>
 
-  <input id="fileInput" type="file" accept="application/json" style="display:none" />
+  <input id="fileInput" type="file" accept="application/json" style="display:none"/>
 
   <script>
-    /* ==== Firebase config ==== */
-    const FIREBASE_CONFIG={
-      apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
-      authDomain:"livstracker.firebaseapp.com",
-      projectId:"livstracker",
-      storageBucket:"livstracker.firebasestorage.app",
-      messagingSenderId:"885451038080",
-      appId:"1:885451038080:web:3df131af07a258a5bc7565"
-    };
+    // ---------- CONFIG ----------
+    const FIREBASE_CONFIG={apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",authDomain:"livstracker.firebaseapp.com",projectId:"livstracker",storageBucket:"livstracker.firebasestorage.app",messagingSenderId:"885451038080",appId:"1:885451038080:web:3df131af07a258a5bc7565"};
 
-    /* ==== Utils ==== */
+    // ---------- UTILS ----------
     const $=id=>document.getElementById(id);
-    const todayISO=()=>new Date().toISOString().slice(0,10);
-    const iso=d=>new Date(d).toISOString().slice(0,10);
-    const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;}
-    const lastNDates=n=>{const out=[],b=new Date();for(let i=0;i<n;i++) out.push(iso(addDays(b,-i)));return out;}
+    const showBar=msg=>{const el=$("authHint");el.textContent=msg;el.style.display="block"};
+    const hideBar=()=>$("authHint").style.display="none";
+    const todayISO=()=>new Date().toISOString().slice(0,10), iso=d=>new Date(d).toISOString().slice(0,10);
+    const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+    const lastNDates=n=>{const out=[],b=new Date();for(let i=0;i<n;i++) out.push(iso(addDays(b,-i)));return out};
     const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
 
-    /* ==== IndexedDB ==== */
-    const DB_NAME='livstracker', DB_VERSION=3; let db;
+    // ---------- INDEXEDDB ----------
+    const DB_NAME='livstracker',DB_VERSION=3;let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result;
-        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
-        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
-        if(!d.objectStoreNames.contains('tombstones')) d.createObjectStore('tombstones',{keyPath:'id'});
-      };
-      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
-    });}
+      rq.onupgradeneeded=()=>{const d=rq.result;if(!d.objectStoreNames.contains('fields'))d.createObjectStore('fields',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('entries'))d.createObjectStore('entries',{keyPath:'date'});
+        if(!d.objectStoreNames.contains('tombstones'))d.createObjectStore('tombstones',{keyPath:'id'});};
+      rq.onsuccess=()=>{db=rq.result;res()};rq.onerror=()=>rej(rq.error)})}
     const idbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
     const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).put(v);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
     const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
 
-    /* ==== App-state ==== */
+    // ---------- STATE ----------
     let state={fields:[],entries:{},uid:null,axisMapMode:'auto',currentDate:todayISO(),historyExpanded:false};
     const getEntry=d=>state.entries[d]||{};
     const isEmptyVal=(v,t)=>t==='boolean'?v==null:t==='number'?(v===''||v==null||Number.isNaN(v)):t==='text'?(v===''||v==null):v==null;
     const isEmptyEntry=v=>{if(!v)return true;for(const [fid,val] of Object.entries(v)){const f=state.fields.find(x=>x.id===fid);if(!f)continue;if(!isEmptyVal(val,f.type))return false}return true};
 
-    /* ==== Firebase/Auth ==== */
-    let fb={enabled:false,app:null,auth:null,db:null};
-    let unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
+    // ---------- FIREBASE / AUTH ----------
+    let fb={enabled:false,app:null,auth:null,db:null},unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
 
     async function setBestPersistence(auth){
       try{await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);return'LOCAL'}catch{}
@@ -162,37 +140,49 @@
       await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);return'NONE'
     }
 
-    async function tryInitFirebase(){
-      if(!FIREBASE_CONFIG?.apiKey) return;
-      if(!window.firebase) throw new Error("Firebase SDK ikke lastet");
-
+    async function initFirebase(){
+      const sdkOk=!!window.firebase; $("sdkChip").textContent="SDK: "+(sdkOk?"ok":"mangler"); if(!sdkOk){showBar("Finner ikke Firebase SDK."); return;}
       fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true;
-      fb.auth.useDeviceLanguage();
-      await setBestPersistence(fb.auth); // persistence før login
-      try{ await fb.db.enablePersistence({ synchronizeTabs:true }); }catch(e){}
+      fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true; fb.auth.useDeviceLanguage();
+      const p=await setBestPersistence(fb.auth); $("sdkChip").textContent+=" • "+p;
+      try{await fb.db.enablePersistence({synchronizeTabs:true})}catch{}
 
-      try{ await fb.auth.getRedirectResult(); }catch(e){ if((e?.code||'')!=='auth/no-auth-event') alert(`Redirect-feil: ${e?.code||''} ${e?.message||''}`); }
-    }
-
-    async function signIn(){
-      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-      const provider=new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({prompt:'select_account'});
-      try{
-        await fb.auth.signInWithPopup(provider);
-      }catch(e){
-        const code=e?.code||'';
-        if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')){
-          await fb.auth.signInWithRedirect(provider);
-          return;
+      // OBSERVER FØR redirect-resultat
+      fb.auth.onAuthStateChanged(async user=>{
+        if(user){
+          hideBar(); state.uid=user.uid; $("syncStatus").textContent="Pålogget";
+          $("btnLogin").style.display="none"; $("btnLogout").style.display="inline-block";
+          if(!firstSynced){firstSynced=true; await startSync(user.uid).catch(e=>showBar("Synk-feil: "+(e?.message||e)))}
+        }else{
+          state.uid=null; $("syncStatus").textContent="Ikke pålogget";
+          $("btnLogout").style.display="none"; $("btnLogin").style.display="inline-block";
+          if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
         }
-        alert(`Login-feil: ${code} ${e?.message||''}`);
-      }
-    }
-    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch{} }
+      });
 
-    /* ==== Full 2-veis synk (inkl. sletting) ==== */
+      // Fullfør redirect (viser bare ekte feil)
+      try{
+        if(sessionStorage.getItem('lt_redirect')==='1'){
+          const res=await fb.auth.getRedirectResult();
+          sessionStorage.removeItem('lt_redirect');
+          if(!res || !res.user){ showBar("Login returnerte uten bruker. Sjekk Authorized domains og cookies."); }
+        }else{
+          await fb.auth.getRedirectResult().catch(e=>{if((e?.code||'')!=='auth/no-auth-event')showBar(`Redirect-feil: ${e.code} ${e.message}`)});
+        }
+      }catch(e){ if((e?.code||'')!=='auth/no-auth-event') showBar(`Redirect-feil: ${e.code} ${e.message}`); }
+    }
+
+    async function signIn(){ // redirect-first: mest stabilt
+      if(!fb.enabled) return showBar("Firebase ikke klar");
+      const provider=new firebase.auth.GoogleAuthProvider(); provider.setCustomParameters({prompt:'select_account'});
+      sessionStorage.setItem('lt_redirect','1');
+      try{ await fb.auth.signInWithRedirect(provider); }catch(e){ showBar(`Login-feil: ${e.code||''} ${e.message||''}`); alert(`Login-feil: ${e.code||''}\n${e.message||''}`); }
+      return false;
+    }
+    window.__login=signIn; // inline fallback
+    async function signOut(){ try{ await fb.auth.signOut(); }catch{} }
+
+    // ---------- SYNC (to-veis + tombstones) ----------
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -214,19 +204,14 @@
         await u.collection('tombstones').doc(`field_${fieldId}`).set({type:'field',fieldId,deletedAt:Date.now()},{merge:true});
       }
     }
-
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap,esSnap,tsSnap]=await Promise.all([
-        u.collection('fields').get(),
-        u.collection('entries').get(),
-        u.collection('tombstones').get().catch(()=>({empty:true,forEach:()=>{}}))
+        u.collection('fields').get(), u.collection('entries').get(), u.collection('tombstones').get().catch(()=>({empty:true,forEach:()=>{}}))
       ]);
-
-      const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data(); remoteFields.set(v.id,v);});
-      const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data(); remoteEntries.set(v.date, v.values||{});});
-      const rFieldT=new Set(), rEntryT=new Set();
-      tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) rEntryT.add(v.date); if(v.type==='field'&&v.fieldId) rFieldT.add(v.fieldId); });
+      const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data();remoteFields.set(v.id,v)});
+      const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data();remoteEntries.set(v.date,v.values||{})});
+      const rFieldT=new Set(), rEntryT=new Set(); tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) rEntryT.add(v.date); if(v.type==='field'&&v.fieldId) rFieldT.add(v.fieldId); });
 
       const localFields=state.fields.map(f=>({...f,updatedAt:f.updatedAt||Date.now()}));
       const localEntries={...state.entries};
@@ -235,117 +220,57 @@
       const lFieldT=new Set(localTombs.filter(t=>t.type==='field').map(t=>t.fieldId));
 
       const byId=new Map(remoteFields);
-      for(const lf of localFields){
-        if(rFieldT.has(lf.id)||lFieldT.has(lf.id)) continue;
-        const rf=byId.get(lf.id);
-        if(!rf || (lf.updatedAt||0)>=(rf?.updatedAt||0)) byId.set(lf.id,{...rf,...lf,updatedAt:lf.updatedAt||Date.now()});
-      }
+      for(const lf of localFields){ if(rFieldT.has(lf.id)||lFieldT.has(lf.id)) continue; const rf=byId.get(lf.id); if(!rf || (lf.updatedAt||0)>=(rf?.updatedAt||0)) byId.set(lf.id,{...rf,...lf,updatedAt:lf.updatedAt||Date.now()}); }
       for(const fid of new Set([...rFieldT,...lFieldT])) byId.delete(fid);
       const mergedFields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
 
-      const mergedEntries={}; remoteEntries.forEach((vals,date)=>{ mergedEntries[date]={...vals}; });
-      for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}), ...vals}; }
-      const allFieldT=new Set([...rFieldT,...lFieldT]);
-      if(allFieldT.size){
-        for(const [date,vals] of Object.entries(mergedEntries)){
-          for(const fid of allFieldT){ if(fid in vals) delete vals[fid]; }
-          if(isEmptyEntry(vals)) delete mergedEntries[date];
-        }
-      }
+      const mergedEntries={}; remoteEntries.forEach((vals,date)=>{mergedEntries[date]={...vals}});
+      for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}),...vals} }
+      const allFieldT=new Set([...rFieldT,...lFieldT]); if(allFieldT.size){ for(const [date,vals] of Object.entries(mergedEntries)){ for(const fid of allFieldT){ if(fid in vals) delete vals[fid]; } if(isEmptyEntry(vals)) delete mergedEntries[date]; } }
       const allEntryT=new Set([...rEntryT,...lEntryT]); for(const date of allEntryT) delete mergedEntries[date];
 
       const batch=fb.db.batch();
       for(const f of mergedFields) batch.set(u.collection('fields').doc(f.id), {...f,updatedAt:f.updatedAt||Date.now()},{merge:true});
-      for(const [date,values] of Object.entries(mergedEntries)) batch.set(u.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true});
-      for(const fid of allFieldT) { batch.delete(u.collection('fields').doc(fid)); batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true}); }
-      for(const date of allEntryT) { batch.delete(u.collection('entries').doc(date)); batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true}); }
+      for(const [date,values] of Object.entries(mergedEntries)) batch.set(u.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true});
+      for(const fid of allFieldT){ batch.delete(u.collection('fields').doc(fid)); batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true}); }
+      for(const date of allEntryT){ batch.delete(u.collection('entries').doc(date)); batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true}); }
       await batch.commit();
 
       state.fields=mergedFields; state.entries=mergedEntries;
-      for(const f of mergedFields) await idbSet('fields', f);
-      for(const [date,values] of Object.entries(mergedEntries)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+      for(const f of mergedFields) await idbSet('fields',f);
+      for(const [d,vals] of Object.entries(mergedEntries)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()});
       for(const fid of allFieldT) await idbSet('tombstones',{id:`field:${fid}`,type:'field',fieldId:fid,deletedAt:Date.now()});
       for(const date of allEntryT) await idbSet('tombstones',{id:`entry:${date}`,type:'entry',date,deletedAt:Date.now()});
     }
-
     async function startSync(uid){
       if(!firstSynced){ await reconcileAndUpload(uid); firstSynced=true; }
       if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
       const u=fb.db.collection('users').doc(uid);
-
-      unsubFields=u.collection('fields').onSnapshot(async snap=>{
-        const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v);});
-        state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
-        for(const f of state.fields) await idbSet('fields',f);
-        renderAll();
-      });
-
-      unsubEntries=u.collection('entries').onSnapshot(async snap=>{
-        const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
-        state.entries=all;
-        for(const [d,vals] of Object.entries(all)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()});
-        renderAll();
-      });
-
-      unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{
-        let changed=false;
-        snap.forEach(async d=>{
-          const v=d.data();
-          if(v.type==='entry' && v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries', v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); }
-          if(v.type==='field' && v.fieldId){ if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; } await idbDelete('fields', v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v}); for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } } }
-        });
-        if(changed) renderAll();
-      });
+      unsubFields=u.collection('fields').onSnapshot(async snap=>{const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v)}); state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name)); for(const f of state.fields) await idbSet('fields',f); renderAll();});
+      unsubEntries=u.collection('entries').onSnapshot(async snap=>{const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{}}); state.entries=all; for(const [d,vals] of Object.entries(all)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); renderAll();});
+      unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{let changed=false; snap.forEach(async d=>{const v=d.data(); if(v.type==='entry'&&v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries',v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); } if(v.type==='field'&&v.fieldId){ if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; } await idbDelete('fields',v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v}); for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } } }}); if(changed) renderAll();});
     }
 
-    /* ==== CRUD ==== */
-    async function pushField(f){
-      const val={...f,updatedAt:f.updatedAt||Date.now()};
-      await idbSet('fields', val);
-      if(fb.enabled && state.uid){
-        await fb.db.collection('users').doc(state.uid).collection('fields').doc(val.id).set(val,{merge:true});
-        await fb.db.collection('users').doc(state.uid).collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{});
-        await idbDelete('tombstones', `field:${val.id}`);
-      }
-    }
-    async function deleteField(fieldId){ await markFieldDeleted(fieldId); renderAll(); }
-    async function pushEntry(date,values){
-      if(isEmptyEntry(values)){ await markEntryDeleted(date); renderAll(); return; }
-      const val={date,values,updatedAt:Date.now()};
-      await idbSet('entries', val);
-      await idbDelete('tombstones', `entry:${date}`);
-      if(fb.enabled && state.uid){
-        const u=fb.db.collection('users').doc(state.uid);
-        await u.collection('entries').doc(date).set(val,{merge:true});
-        await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
-      }
-    }
-
-    /* ==== Graf ==== */
-    const chartCtx=$('chart').getContext('2d'), legendEl=$('legend'), periodEl=$('period'), axisEl=$('axisMap'), showGoalsEl=$('showGoals');
+    // ---------- UI / GRAF ----------
+    const chartCtx=$('chart').getContext('2d'); let chart;
     function pickAxis(f){ if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1'; const n=(f.name||'').toLowerCase(); if(n.includes('score')||n.includes('%'))return'y'; if(n.includes('timer')||n.includes('min')||n.includes('trening'))return'y1'; return (typeof f.goal==='number'&&f.goal>10)?'y':'y1'; }
-    let chart;
     function renderChart(){
-      const period=periodEl.value, since=(period==='all'?null:addDays(new Date(),-({'14d':14,'30d':30,'365d':365}[period])));
-      const dates=Object.keys(state.entries).sort().filter(d=>!since||new Date(d)>=since);
-      const labels=[...dates]; const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#22d3ee','#60a5fa','#93c5fd'];
-      const nums=state.fields.filter(f=>f.type==='number');
-      const datasets=[]; nums.forEach((f,i)=>{ const data=labels.map(d=>{const v=state.entries[d]?.[f.id]; return typeof v==='number'?v:null}); const axis=pickAxis(f); datasets.push({label:f.name,data,yAxisID:axis,borderColor:colors[i%colors.length],backgroundColor:'transparent',pointRadius:0,tension:.25}); if(showGoalsEl.checked&&typeof f.goal==='number') datasets.push({label:f.name+' mål',data:labels.map(()=>f.goal),yAxisID:axis,borderColor:colors[i%colors.length],borderDash:[6,6],pointRadius:0,tension:0}); });
-      if(chart) chart.destroy();
-      const cs=getComputedStyle(document.documentElement);
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets},options:{responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},scales:{y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')}},y1:{position:'right',min:0,max:10,grid:{drawOnChartArea:false}},x:{grid:{color:cs.getPropertyValue('--border')}}}}});
-      legendEl.innerHTML=''; nums.forEach(f=>{ const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`; row.querySelector('button').onclick=()=>{ const i=chart.data.datasets.findIndex(d=>d.label===f.name); const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål'); if(i>=0) chart.toggleDataVisibility(i); if(gi>=0) chart.toggleDataVisibility(gi); chart.update(); }; legendEl.appendChild(row); });
+      const period=$('period').value, since=(period==='all'?null:addDays(new Date(),-({'14d':14,'30d':30,'365d':365}[period])));
+      const labels=Object.keys(state.entries).sort().filter(d=>!since||new Date(d)>=since);
+      const nums=state.fields.filter(f=>f.type==='number'); const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#22d3ee','#60a5fa','#93c5fd'];
+      const ds=[]; nums.forEach((f,i)=>{const data=labels.map(d=>{const v=state.entries[d]?.[f.id]; return typeof v==='number'?v:null}); const axis=pickAxis(f); ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[i%colors.length],backgroundColor:'transparent',pointRadius:0,tension:.25}); if($('showGoals').checked&&typeof f.goal==='number') ds.push({label:f.name+' mål',data:labels.map(()=>f.goal),yAxisID:axis,borderColor:colors[i%colors.length],borderDash:[6,6],pointRadius:0,tension:0});});
+      if(chart) chart.destroy(); const cs=getComputedStyle(document.documentElement);
+      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},scales:{y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')}},y1:{position:'right',min:0,max:10,grid:{drawOnChartArea:false}},x:{grid:{color:cs.getPropertyValue('--border')}}}}});
+      const legend=$('legend'); legend.innerHTML=''; nums.forEach(f=>{const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`; row.querySelector('button').onclick=()=>{const i=chart.data.datasets.findIndex(d=>d.label===f.name);const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');if(i>=0)chart.toggleDataVisibility(i);if(gi>=0)chart.toggleDataVisibility(gi);chart.update()}; legend.appendChild(row);});
     }
 
-    /* ==== Registrering + 14d ==== */
     const dateInput=$('dateInput'), btnPrev=$('btnPrev'), btnNext=$('btnNext'), todaySummary=$('todaySummary'), miniCards=$('miniCards'), history14=$('history14');
-    function segToggle(val,onChange){ const el=document.createElement('div'); el.className='seg'; const b0=document.createElement('button'); const b1=document.createElement('button'); b0.textContent='Av'; b1.textContent='På'; const set=v=>{ b1.setAttribute('aria-pressed',String(!!v)); b0.setAttribute('aria-pressed',String(!v)); onChange(v); }; set(!!val); b0.onclick=()=>set(false); b1.onclick=()=>set(true); el.append(b0,b1); return el; }
+    function segToggle(val,onChange){const el=document.createElement('div'); el.style.display='inline-flex'; el.style.gap='6px'; const off=document.createElement('button');const on=document.createElement('button');off.className='btn';on.className='btn';off.textContent='Av';on.textContent='På'; const set=v=>{on.style.background=v?'#5aa7ff':'';on.style.color=v?'#fff':'';off.style.background=v?'':'#5aa7ff33'; onChange(v)}; set(!!val); off.onclick=()=>set(false); on.onclick=()=>set(true); el.append(off,on); return el;}
     function renderToday(){
       dateInput.value=state.currentDate; todaySummary.innerHTML='';
       const date=state.currentDate, values=getEntry(date);
       state.fields.forEach(f=>{
-        const row=document.createElement('div'); row.className='item';
-        let ctrl; const val=values[f.id];
+        const row=document.createElement('div'); row.className='item'; let ctrl; const val=values[f.id];
         if(f.type==='number'){ ctrl=document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value=(val??''); ctrl.oninput=()=>pushEntry(date,{...getEntry(date),[f.id]:ctrl.value===''?null:Number(ctrl.value)}); }
         else if(f.type==='boolean'){ ctrl=segToggle(!!val, v=>pushEntry(date,{...getEntry(date),[f.id]:v})); }
         else { ctrl=document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='skriv…'; ctrl.style.minWidth='220px'; ctrl.value=val??''; let t; const commit=()=>{clearTimeout(t); t=setTimeout(()=>pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}),200)}; ctrl.oninput=commit; ctrl.onchange=commit; }
@@ -354,99 +279,53 @@
       });
     }
     function render14(){
-      const dates=lastNDates(14).reverse();
-      // mini KPI
-      miniCards.innerHTML='';
-      state.fields.filter(f=>f.type==='number').forEach(f=>{
-        const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
-        const avg=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null;
-        const el=document.createElement('div'); el.className='item';
-        el.innerHTML=`<div style="flex:1"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div>${avg!=null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`;
-        miniCards.appendChild(el);
-      });
-      // history rows (3 eller 14)
-      const sel=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse();
-      history14.innerHTML='';
-      sel.forEach(d=>{
-        const vals=getEntry(d); const parts=Object.entries(vals).filter(([_,v])=>v!=null&&v!=='').map(([id,v])=>{const f=state.fields.find(x=>x.id===id); if(!f) return ''; if(f.type==='text') return `<b>${f.name}:</b> ${String(v).slice(0,120)}`; if(f.type==='boolean') return `<b>${f.name}:</b> ${v?'På':'Av'}`; return `<b>${f.name}:</b> ${v}`;}).join(' • ');
-        if(!parts) return;
-        const row=document.createElement('div'); row.className='item';
-        row.innerHTML=`<div style="flex:1"><b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b><div class="small muted">${parts}</div></div><button class="btn small" data-open="${d}">Åpne</button>`;
-        row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
-        history14.appendChild(row);
-      });
+      const dates=lastNDates(14).reverse(); miniCards.innerHTML=''; state.fields.filter(f=>f.type==='number').forEach(f=>{const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number'); const avg=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null; const el=document.createElement('div'); el.className='item'; el.innerHTML=`<div style="flex:1"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div>${avg!=null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`; miniCards.appendChild(el);});
+      const sel=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse(); history14.innerHTML='';
+      sel.forEach(d=>{const vals=getEntry(d), parts=Object.entries(vals).filter(([_,v])=>v!=null&&v!=='').map(([id,v])=>{const f=state.fields.find(x=>x.id===id); if(!f) return ''; if(f.type==='text') return `<b>${f.name}:</b> ${String(v).slice(0,120)}`; if(f.type==='boolean') return `<b>${f.name}:</b> ${v?'På':'Av'}`; return `<b>${f.name}:</b> ${v}`;}).join(' • '); if(!parts) return; const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div style="flex:1"><b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b><div class="small muted">${parts}</div></div><button class="btn small" data-open="${d}">Åpne</button>`; row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); }; history14.appendChild(row);});
     }
-
-    /* ==== Binding ==== */
-    const syncStatus=$('syncStatus'), netEl=$('net');
-    function bindUI(){
-      $('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='livstracker-export.json';a.click();URL.revokeObjectURL(url)};
-      $('btnImport').onclick=()=>$('fileInput').click(); $('fileInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{const data=JSON.parse(t); state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();});};
-      $('btnLogin').onclick=signIn; $('btnLogout').onclick=signOut;
-      const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted')}; upd(); addEventListener('online',upd); addEventListener('offline',upd);
-      $('btnAddField').onclick=async()=>{ const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked}; const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g); await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll(); };
-      $('btnToggleHistory').onclick=()=>{state.historyExpanded=!state.historyExpanded; render14();};
-      $('period').onchange=renderChart; $('axisMap').onchange=e=>{state.axisMapMode=e.target.value; renderChart();}; $('showGoals').onchange=renderChart;
-      $('dateInput').onchange=()=>{state.currentDate=$('dateInput').value; renderToday(); render14(); renderChart();};
-      $('btnPrev').onclick=()=>{state.currentDate=iso(addDays(state.currentDate,-1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
-      $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
-    }
-    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
     function renderFieldList(){
       const box=$('fieldsList'); box.innerHTML='';
       state.fields.forEach(f=>{
         const w=document.createElement('div'); w.className='item';
         w.innerHTML=`<div style="flex:1"><b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål: ${f.goal}`:''}${f.includeInProgress?` • i fremdrift`:''}</span></div>
-          <div class="row"><button class="btn small" data-edit>Oppdater</button><button class="btn small" data-del>Fjern</button></div>`;
-        w.querySelector('[data-edit]').onclick=async()=>{
-          const name=prompt('Navn',f.name)??f.name;
-          const type=prompt('Type (number|boolean|text)',f.type)??f.type;
-          let goal=(type==='number') ? prompt('Mål (tom for ingen)', (typeof f.goal==='number'?f.goal:'')) : '';
-          goal=(goal===''?undefined:Number(goal));
-          const include=confirm('I fremdrift? OK=Ja / Cancel=Nei');
-          await pushField({id:f.id,name,type,goal,includeInProgress:include,updatedAt:Date.now()}); renderAll();
-        };
-        w.querySelector('[data-del]').onclick=()=>deleteField(f.id);
+          <div class="row"><button class="btn small" data-del>Fjern</button></div>`;
+        w.querySelector('[data-del]').onclick=()=>markFieldDeleted(f.id);
         box.appendChild(w);
       });
     }
+    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
 
-    /* ==== Boot ==== */
+    // ---------- CRUD ----------
+    async function pushField(f){ const val={...f,updatedAt:f.updatedAt||Date.now()}; await idbSet('fields',val); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('fields').doc(val.id).set(val,{merge:true}); await u.collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{}); await idbDelete('tombstones',`field:${val.id}`);} }
+    async function pushEntry(date,values){ if(isEmptyEntry(values)){ await markEntryDeleted(date); renderAll(); return; } const val={date,values,updatedAt:Date.now()}; await idbSet('entries',val); await idbDelete('tombstones',`entry:${date}`); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('entries').doc(date).set(val,{merge:true}); await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});} }
+
+    // ---------- BIND ----------
+    function bindUI(){
+      $('btnLogin').addEventListener('click',signIn);
+      $('btnLogout').onclick=signOut;
+      $('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download="livstracker-export.json";a.click();URL.revokeObjectURL(url)};
+      $('btnImport').onclick=()=>$('fileInput').click();
+      $('fileInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{const data=JSON.parse(t); state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();});};
+      $('btnAddField').onclick=async()=>{ const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked}; const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g); await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll(); };
+      $('btnToggleHistory').onclick=()=>{state.historyExpanded=!state.historyExpanded; render14();};
+      $('period').onchange=renderChart; $('axisMap').onchange=e=>{state.axisMapMode=e.target.value; renderChart();}; $('showGoals').onchange=renderChart;
+      const upd=()=>{const on=navigator.onLine; $('net').textContent=on?'Online':'Offline'; $('net').className='small '+(on?'':'muted')}; upd(); addEventListener('online',upd); addEventListener('offline',upd);
+      $('dateInput').onchange=()=>{state.currentDate=$('dateInput').value; renderToday(); render14(); renderChart();};
+      $('btnPrev').onclick=()=>{state.currentDate=iso(addDays(state.currentDate,-1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
+      $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
+    }
+
+    // ---------- BOOT ----------
     window.addEventListener('load', async ()=>{
       await idbOpen();
       const fs=await idbGetAll('fields'); state.fields=[...new Map(fs.map(f=>[f.id,f])).values()];
       const es=await idbGetAll('entries'); state.entries=Object.fromEntries(es.map(x=>[x.date,x.values]));
+      $('sdkChip').title='Hvis login ikke fester: sjekk Authorized domains (localhost/127.0.0.1/LAN/Vercel) og cookies';
       bindUI(); state.currentDate=todayISO(); renderAll();
-
-      await tryInitFirebase(); // auth init
-      if(fb.enabled){
-        fb.auth.onAuthStateChanged(async user=>{
-          if(user){
-            state.uid=user.uid; syncStatus.textContent='Pålogget';
-            $('btnLogout').style.display='inline-block'; $('btnLogin').style.display='none';
-            await startSync(user.uid);
-          }else{
-            state.uid=null; syncStatus.textContent='Ikke pålogget';
-            $('btnLogout').style.display='none'; $('btnLogin').style.display='inline-block';
-            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
-          }
-        });
-      } else {
-        syncStatus.textContent='Kun lokal lagring';
-      }
-
-      // Demo hvis helt tomt
-      if(!state.fields.length){
-        await pushField({id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,updatedAt:Date.now()});
-        await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,updatedAt:Date.now()});
-        await pushField({id:'workout_min',name:'Trening (min)',type:'number',goal:30,includeInProgress:true,updatedAt:Date.now()});
-        await pushField({id:'gratitude',name:'Takknemlighet',type:'text',updatedAt:Date.now()});
-        await pushField({id:'no_alcohol',name:'Alkoholfri dag',type:'boolean',includeInProgress:true,updatedAt:Date.now()});
-      }
-      renderAll();
+      await initFirebase(); // etter UI-binding
     });
 
-    /* Firestore Rules (referanse):
+    /* Firestore Rules (referanse)
     rules_version = '2';
     service cloud.firestore {
       match /databases/{db}/documents {
