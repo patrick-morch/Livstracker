@@ -6,27 +6,36 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Livstracker</title>
 
-  <!-- Prefers CDN, men vi har også dynamisk fallback i JS -->
+  <!-- Libs (vi har også dynamisk fallback i JS) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js" defer></script>
 
   <style>
-    :root{--bg:#0b0d10;--card:#11151a;--surface:#0f131a;--text:#e7e7e7;--muted:#9aa4af;--border:#1d232c;--accent:#5aa7ff;--radius:14px}
-    *{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+    :root{
+      --bg:#0b0d10;--card:#11151a;--surface:#0f131a;--text:#e7e7e7;--muted:#9aa4af;
+      --border:#1d232c;--accent:#5aa7ff;--radius:16px
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.5 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(11,13,16,.9);backdrop-filter:blur(8px)}
     h1{font-size:16px;margin:0}.muted{color:var(--muted)}.small{font-size:12px}
     .container{max-width:1200px;margin:0 auto;padding:0 16px}
     main{padding:16px 0;display:grid;gap:16px;grid-template-columns:repeat(12,minmax(0,1fr))}
-    .span-12{grid-column:span 12}@media (max-width:960px){main{grid-template-columns:repeat(6,1fr)}.span-12{grid-column:span 6}}
+    .span-12{grid-column:span 12}
+    @media (max-width:960px){main{grid-template-columns:repeat(6,1fr)}.span-12{grid-column:span 6}}
     .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.list{display:grid;gap:8px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .list{display:grid;gap:8px}
     .btn{padding:8px 12px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;cursor:pointer}
-    .btn.primary{background:var(--accent);border-color:transparent;color:#fff}.btn.ghost{background:transparent}
+    .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+    .btn.ghost{background:transparent}
     .input,.select,textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:10px}
-    .item{display:flex;gap:10px;align-items:center;border:1px dashed var(--border);border-radius:10px;padding:8px 10px;background:#0f131a}
+    .item{display:flex;gap:10px;align-items:center;border:1px dashed var(--border);border-radius:12px;padding:8px 10px;background:#0f131a}
+    .chip{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f131a;cursor:pointer}
     #authHint{position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;display:none}
+    .hearts{font-size:18px;letter-spacing:2px}
   </style>
 </head>
 <body>
@@ -40,21 +49,35 @@
     <div style="flex:1"></div>
     <button id="btnImport" class="btn">Importer</button>
     <button id="btnExport" class="btn ghost">Eksporter</button>
-    <!-- Inline fallback sikrer at klikk alltid kaller login -->
     <button id="btnLogin" class="btn primary" onclick="window.__login && window.__login()">Logg inn</button>
     <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
   </header>
 
   <div class="container">
     <main>
-      <section class="card span-12" style="display:grid;grid-template-columns:1fr 1.3fr;gap:16px">
+      <!-- Registrering + Graf -->
+      <section class="card span-12" style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px">
         <!-- Registrering -->
         <div>
           <div class="row" style="justify-content:space-between">
             <label>Dato <input id="dateInput" class="input" type="date"/></label>
-            <div class="row"><button id="btnPrev" class="btn">◀︎</button><button id="btnNext" class="btn">▶︎</button></div>
+            <div class="row">
+              <button id="btnPrev" class="btn">◀︎</button>
+              <button id="btnNext" class="btn">▶︎</button>
+            </div>
           </div>
-          <div id="todaySummary" class="list" style="margin-top:10px"></div>
+
+          <!-- Dagens oversikt -->
+          <div id="progressBox" class="item" style="justify-content:space-between;margin:10px 0">
+            <div>
+              <div class="small muted">Dagens oversikt</div>
+              <div id="progressText" style="font-weight:600">0/0 (0%)</div>
+            </div>
+            <div id="progressHearts" class="hearts">🤍🤍🤍</div>
+          </div>
+
+          <!-- Inputs for valgt dato -->
+          <div id="todaySummary" class="list"></div>
         </div>
 
         <!-- Graf -->
@@ -73,26 +96,47 @@
               <input type="checkbox" id="showGoals"/> Mål-linjer
             </label>
           </div>
-          <canvas id="chart" height="170"></canvas>
+          <canvas id="chart" height="180"></canvas>
           <div id="legend" class="list" style="margin-top:8px"></div>
-          <div class="small muted">Kun tallfelt i grafen</div>
+          <div class="small muted">Kun tallfelt i grafen • Venstre 0–100 • Høyre 0–12</div>
         </div>
       </section>
 
+      <!-- Felt -->
       <section class="card span-12">
-        <h2 style="margin:0 0 8px 0">Felt</h2>
-        <div class="row" style="margin-bottom:10px">
+        <h2 style="margin:0 0 6px 0">Felt</h2>
+
+        <div class="row" style="margin-bottom:8px">
           <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" style="min-width:220px"/>
-          <select id="f_type" class="select"><option value="number">Tall</option><option value="boolean">Av/på</option><option value="text">Tekst</option></select>
+          <select id="f_type" class="select">
+            <option value="number">Tall</option>
+            <option value="boolean">Av/på (checkbox)</option>
+            <option value="text">Tekst</option>
+          </select>
           <input id="f_goal" class="input" type="number" step="any" inputmode="decimal" placeholder="Mål (valgfritt, tall)"/>
           <label class="small" style="display:flex;align-items:center;gap:8px"><input id="f_include" type="checkbox"/> I fremdrift</label>
           <button id="btnAddField" class="btn">Legg til</button>
         </div>
+
+        <!-- Rask legg-til -->
+        <div class="row" id="quickAdd" style="gap:8px;margin-bottom:8px">
+          <span class="small muted">Rask:</span>
+          <span class="chip" data-quick="sleep_score">Søvnscore %</span>
+          <span class="chip" data-quick="sleep_hours">Søvn (timer)</span>
+          <span class="chip" data-quick="workout_min">Trening (min)</span>
+          <span class="chip" data-quick="read_min">Lese (min)</span>
+          <span class="chip" data-quick="gratitude">Takknemlighet</span>
+        </div>
+
         <div id="fieldsList" class="list"></div>
       </section>
 
+      <!-- 14 dager -->
       <section class="card span-12">
-        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Siste 14 dager</h2><button id="btnToggleHistory" class="btn">Utvid</button></div>
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Siste 14 dager</h2>
+          <button id="btnToggleHistory" class="btn">Utvid</button>
+        </div>
         <div id="miniCards" class="list" style="margin-top:8px"></div>
         <div id="history14" class="list" style="margin-top:10px"></div>
       </section>
@@ -102,8 +146,15 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none"/>
 
   <script>
-    // ===== Config =====
-    const FIREBASE_CONFIG={apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",authDomain:"livstracker.firebaseapp.com",projectId:"livstracker",storageBucket:"livstracker.firebasestorage.app",messagingSenderId:"885451038080",appId:"1:885451038080:web:3df131af07a258a5bc7565"};
+    // ===== Firebase config =====
+    const FIREBASE_CONFIG={
+      apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
+      authDomain:"livstracker.firebaseapp.com",
+      projectId:"livstracker",
+      storageBucket:"livstracker.firebasestorage.app",
+      messagingSenderId:"885451038080",
+      appId:"1:885451038080:web:3df131af07a258a5bc7565"
+    };
 
     // ===== Utils =====
     const $=id=>document.getElementById(id);
@@ -117,15 +168,18 @@
     // ===== IndexedDB =====
     const DB_NAME='livstracker',DB_VERSION=3;let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result;if(!d.objectStoreNames.contains('fields'))d.createObjectStore('fields',{keyPath:'id'});
+      rq.onupgradeneeded=()=>{const d=rq.result;
+        if(!d.objectStoreNames.contains('fields'))d.createObjectStore('fields',{keyPath:'id'});
         if(!d.objectStoreNames.contains('entries'))d.createObjectStore('entries',{keyPath:'date'});
-        if(!d.objectStoreNames.contains('tombstones'))d.createObjectStore('tombstones',{keyPath:'id'});};
-      rq.onsuccess=()=>{db=rq.result;res()};rq.onerror=()=>rej(rq.error)})}
+        if(!d.objectStoreNames.contains('tombstones'))d.createObjectStore('tombstones',{keyPath:'id'});
+      };
+      rq.onsuccess=()=>{db=rq.result;res()};rq.onerror=()=>rej(rq.error)
+    })}
     const idbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
     const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).put(v);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
     const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
 
-    // ===== State =====
+    // ===== App-state =====
     let state={fields:[],entries:{},uid:null,axisMapMode:'auto',currentDate:todayISO(),historyExpanded:false};
     const getEntry=d=>state.entries[d]||{};
     const isEmptyVal=(v,t)=>t==='boolean'?v==null:t==='number'?(v===''||v==null||Number.isNaN(v)):t==='text'?(v===''||v==null):v==null;
@@ -135,39 +189,33 @@
     let fb={enabled:false,app:null,auth:null,db:null},unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
     let firebaseReadyPromise=null;
 
-    function loadScript(src){
-      return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.defer=true;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});
-    }
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.defer=true;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
     async function ensureFirebaseReady(){
       if(fb.enabled) return;
       if(firebaseReadyPromise) return firebaseReadyPromise;
       firebaseReadyPromise = (async ()=>{
-        // SDK fallback hvis blokkert/ikke lastet
         if(!window.firebase){
           await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js");
           await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js");
           await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js");
         }
-        await initFirebase(); // idempotent
+        await initFirebase();
       })();
       return firebaseReadyPromise;
     }
-
     async function setBestPersistence(auth){
       try{await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);return'LOCAL'}catch{}
       try{await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);return'SESSION'}catch{}
       await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);return'NONE'
     }
-
     async function initFirebase(){
-      if(fb.enabled) return; // idempotent
+      if(fb.enabled) return;
       const sdkOk=!!window.firebase; $("sdkChip").textContent="SDK: "+(sdkOk?"ok":"mangler"); if(!sdkOk){showBar("Firebase SDK mangler."); return;}
       fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
       fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true; fb.auth.useDeviceLanguage();
       const p=await setBestPersistence(fb.auth); $("sdkChip").textContent+=" • "+p;
       try{await fb.db.enablePersistence({synchronizeTabs:true})}catch{}
 
-      // Observer FØR redirect-resultat
       fb.auth.onAuthStateChanged(async user=>{
         if(user){
           hideBar(); state.uid=user.uid; $("syncStatus").textContent="Pålogget";
@@ -180,7 +228,6 @@
         }
       });
 
-      // Fullfør ev. redirect (vis bare ekte feil)
       try{
         if(sessionStorage.getItem('lt_redirect')==='1'){
           const res=await fb.auth.getRedirectResult();
@@ -191,31 +238,25 @@
         }
       }catch(e){ if((e?.code||'')!=='auth/no-auth-event') showBar(`Redirect-feil: ${e.code} ${e.message}`); }
     }
-
     async function signIn(){
       try{
-        await ensureFirebaseReady(); // <- fikser “Firebase ikke klar”
+        await ensureFirebaseReady();
         const provider=new firebase.auth.GoogleAuthProvider(); provider.setCustomParameters({prompt:'select_account'});
         try{
           await fb.auth.signInWithPopup(provider);
         }catch(e){
-          const code=e?.code||'';
-          if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')){
-            sessionStorage.setItem('lt_redirect','1');
-            await fb.auth.signInWithRedirect(provider);
-            return false;
+          const code=e?.code||''; if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')){
+            sessionStorage.setItem('lt_redirect','1'); await fb.auth.signInWithRedirect(provider); return false;
           }
           showBar(`Login-feil: ${code} ${e?.message||''}`); alert(`Login-feil: ${code}\n${e?.message||''}`);
         }
-      }catch(err){
-        showBar("Init-feil: "+(err?.message||err)); alert("Init-feil: "+(err?.message||err));
-      }
+      }catch(err){ showBar("Init-feil: "+(err?.message||err)); alert("Init-feil: "+(err?.message||err)); }
       return false;
     }
     window.__login=signIn;
     async function signOut(){ try{ await fb.auth.signOut(); }catch{} }
 
-    // ===== Synk (2-veis + tombstones) =====
+    // ===== Synk (toveis + tombstones) =====
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -237,11 +278,11 @@
         await u.collection('tombstones').doc(`field_${fieldId}`).set({type:'field',fieldId,deletedAt:Date.now()},{merge:true});
       }
     }
-
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap,esSnap,tsSnap]=await Promise.all([
-        u.collection('fields').get(), u.collection('entries').get(), u.collection('tombstones').get().catch(()=>({empty:true,forEach:()=>{}}))
+        u.collection('fields').get(), u.collection('entries').get(),
+        u.collection('tombstones').get().catch(()=>({empty:true,forEach:()=>{}}))
       ]);
       const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data();remoteFields.set(v.id,v)});
       const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data();remoteEntries.set(v.date,v.values||{})});
@@ -276,48 +317,164 @@
       for(const fid of allFieldT) await idbSet('tombstones',{id:`field:${fid}`,type:'field',fieldId:fid,deletedAt:Date.now()});
       for(const date of allEntryT) await idbSet('tombstones',{id:`entry:${date}`,type:'entry',date,deletedAt:Date.now()});
     }
-
     async function startSync(uid){
       if(!firstSynced){ await reconcileAndUpload(uid); firstSynced=true; }
       if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
       const u=fb.db.collection('users').doc(uid);
-      unsubFields=u.collection('fields').onSnapshot(async snap=>{const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v)}); state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name)); for(const f of state.fields) await idbSet('fields',f); renderAll();});
-      unsubEntries=u.collection('entries').onSnapshot(async snap=>{const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{}}); state.entries=all; for(const [d,vals] of Object.entries(all)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); renderAll();});
-      unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{let changed=false; snap.forEach(async d=>{const v=d.data(); if(v.type==='entry'&&v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries',v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); } if(v.type==='field'&&v.fieldId){ if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; } await idbDelete('fields',v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v}); for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } } }}); if(changed) renderAll();});
+      unsubFields=u.collection('fields').onSnapshot(async snap=>{
+        const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v)});
+        state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
+        for(const f of state.fields) await idbSet('fields',f);
+        renderAll();
+      });
+      unsubEntries=u.collection('entries').onSnapshot(async snap=>{
+        const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
+        state.entries=all;
+        for(const [d,vals] of Object.entries(all)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()});
+        renderAll();
+      });
+      unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{
+        let changed=false;
+        snap.forEach(async d=>{
+          const v=d.data();
+          if(v.type==='entry'&&v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries',v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); }
+          if(v.type==='field'&&v.fieldId){
+            if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; }
+            await idbDelete('fields',v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v});
+            for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } }
+          }
+        });
+        if(changed) renderAll();
+      });
     }
 
-    // ===== UI / Graf / Registrering (uendret fra forrige fungerende) =====
+    // ===== Graf =====
     const chartCtx=document.getElementById('chart').getContext('2d'); let chart;
-    function pickAxis(f){ if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1'; const n=(f.name||'').toLowerCase(); if(n.includes('score')||n.includes('%'))return'y'; if(n.includes('timer')||n.includes('min')||n.includes('trening'))return'y1'; return (typeof f.goal==='number'&&f.goal>10)?'y':'y1'; }
+    function pickAxis(f){
+      if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1';
+      const n=(f.name||'').toLowerCase();
+      if(n.includes('score')||n.includes('%')) return 'y';
+      if(n.includes('timer')||n.includes('min')) return 'y1';
+      return (typeof f.goal==='number'&&f.goal>12)?'y':'y1';
+    }
     function renderChart(){
       const period=$('period').value, since=(period==='all'?null:addDays(new Date(),-({'14d':14,'30d':30,'365d':365}[period])));
       const labels=Object.keys(state.entries).sort().filter(d=>!since||new Date(d)>=since);
-      const nums=state.fields.filter(f=>f.type==='number'); const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#22d3ee','#60a5fa','#93c5fd'];
+      const nums=state.fields.filter(f=>f.type==='number');
+      const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#22d3ee','#60a5fa','#93c5fd'];
       const ds=[]; nums.forEach((f,i)=>{const data=labels.map(d=>{const v=state.entries[d]?.[f.id]; return typeof v==='number'?v:null}); const axis=pickAxis(f); ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[i%colors.length],backgroundColor:'transparent',pointRadius:0,tension:.25}); if($('showGoals').checked&&typeof f.goal==='number') ds.push({label:f.name+' mål',data:labels.map(()=>f.goal),yAxisID:axis,borderColor:colors[i%colors.length],borderDash:[6,6],pointRadius:0,tension:0});});
-      if(chart) chart.destroy(); const cs=getComputedStyle(document.documentElement);
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},scales:{y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')}},y1:{position:'right',min:0,max:10,grid:{drawOnChartArea:false}},x:{grid:{color:cs.getPropertyValue('--border')}}}}});
-      const legend=$('legend'); legend.innerHTML=''; nums.forEach(f=>{const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`; row.querySelector('button').onclick=()=>{const i=chart.data.datasets.findIndex(d=>d.label===f.name);const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');if(i>=0)chart.toggleDataVisibility(i);if(gi>=0)chart.toggleDataVisibility(gi);chart.update()}; legend.appendChild(row);});
+      if(chart) chart.destroy();
+      const cs=getComputedStyle(document.documentElement);
+      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{
+        responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},
+        scales:{
+          y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}},
+          y1:{position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
+          x:{grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}}
+        }
+      }});
+      const legend=$('legend'); legend.innerHTML='';
+      nums.forEach(f=>{
+        const row=document.createElement('div'); row.className='item';
+        row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`;
+        row.querySelector('button').onclick=()=>{const i=chart.data.datasets.findIndex(d=>d.label===f.name);const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');if(i>=0)chart.toggleDataVisibility(i);if(gi>=0)chart.toggleDataVisibility(gi);chart.update()};
+        legend.appendChild(row);
+      });
     }
 
+    // ===== Dagens oversikt (hjerter) =====
+    function computeProgress(date){
+      const vals=getEntry(date);
+      const items=state.fields.filter(f=>f.includeInProgress);
+      let done=0, total=items.length;
+      const detail=items.map(f=>{
+        let d=false; const v=vals[f.id];
+        if(f.type==='boolean') d=!!v;
+        else if(f.type==='number' && typeof f.goal==='number') d=(typeof v==='number') && (v>=f.goal);
+        else if(f.type==='text') d=(v!=null && String(v).trim().length>0);
+        if(d) done++;
+        return {id:f.id,name:f.name,type:f.type,done:d,value:v,goal:f.goal};
+      });
+      const pct=total?Math.round(done*100/total):0;
+      return {done,total,pct,detail};
+    }
+    function renderHearts(pct){
+      // 0–3 hjerter
+      const filled = Math.max(0, Math.min(3, Math.round(pct/33)));
+      return '❤️'.repeat(filled) + '🤍'.repeat(3-filled);
+    }
+    function renderProgress(){
+      const {done,total,pct}=computeProgress(state.currentDate);
+      $('progressText').textContent = `${done}/${total} (${pct}%)`;
+      $('progressHearts').textContent = renderHearts(pct);
+    }
+
+    // ===== Registrering + 14d =====
     const dateInput=$('dateInput'), btnPrev=$('btnPrev'), btnNext=$('btnNext'), todaySummary=$('todaySummary'), miniCards=$('miniCards'), history14=$('history14');
     function segToggle(val,onChange){const el=document.createElement('div'); el.style.display='inline-flex'; el.style.gap='6px'; const off=document.createElement('button');const on=document.createElement('button');off.className='btn';on.className='btn';off.textContent='Av';on.textContent='På'; const set=v=>{on.style.background=v?'#5aa7ff':'';on.style.color=v?'#fff':'';off.style.background=v?'':'#5aa7ff33'; onChange(v)}; set(!!val); off.onclick=()=>set(false); on.onclick=()=>set(true); el.append(off,on); return el;}
+    function clampIfKnown(id, val){
+      if(id==='sleep_score'){ if(val==null) return val; return Math.max(0, Math.min(100, val)); }
+      if(id==='sleep_hours'){ if(val==null) return val; return Math.max(0, Math.min(12, val)); }
+      return val;
+    }
     function renderToday(){
       dateInput.value=state.currentDate; todaySummary.innerHTML='';
       const date=state.currentDate, values=getEntry(date);
       state.fields.forEach(f=>{
-        const row=document.createElement('div'); row.className='item'; let ctrl; const val=values[f.id];
-        if(f.type==='number'){ ctrl=document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value=(val??''); ctrl.oninput=()=>pushEntry(date,{...getEntry(date),[f.id]:ctrl.value===''?null:Number(ctrl.value)}); }
-        else if(f.type==='boolean'){ ctrl=segToggle(!!val, v=>pushEntry(date,{...getEntry(date),[f.id]:v})); }
-        else { ctrl=document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='skriv…'; ctrl.style.minWidth='220px'; ctrl.value=val??''; let t; const commit=()=>{clearTimeout(t); t=setTimeout(()=>pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}),200)}; ctrl.oninput=commit; ctrl.onchange=commit; }
-        row.appendChild(Object.assign(document.createElement('div'),{style:'flex:1',innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}</span>`}));
+        const row=document.createElement('div'); row.className='item';
+        let ctrl; const val=values[f.id];
+        if(f.type==='number'){
+          ctrl=document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value=(val??'');
+          ctrl.oninput=()=>{ const num=ctrl.value===''?null:Number(ctrl.value); const c=clampIfKnown(f.id,num); pushEntry(date,{...getEntry(date),[f.id]:c}); renderProgress(); };
+        }else if(f.type==='boolean'){
+          ctrl=segToggle(!!val, v=>{ pushEntry(date,{...getEntry(date),[f.id]:v}); renderProgress(); });
+        }else{
+          ctrl=document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='skriv…'; ctrl.style.minWidth='220px'; ctrl.value=val??'';
+          let t; const commit=()=>{clearTimeout(t); t=setTimeout(()=>{ pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}); renderProgress(); },200)}; ctrl.oninput=commit; ctrl.onchange=commit;
+        }
+        row.appendChild(Object.assign(document.createElement('div'),{style:'flex:1',innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål ${f.goal}`:''}</span>`}));
         const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap); todaySummary.appendChild(row);
       });
+      renderProgress();
     }
     function render14(){
-      const dates=lastNDates(14).reverse(); miniCards.innerHTML=''; state.fields.filter(f=>f.type==='number').forEach(f=>{const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number'); const avg=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null; const el=document.createElement('div'); el.className='item'; el.innerHTML=`<div style="flex:1"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div>${avg!=null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`; miniCards.appendChild(el);});
-      const sel=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse(); history14.innerHTML='';
-      sel.forEach(d=>{const vals=getEntry(d), parts=Object.entries(vals).filter(([_,v])=>v!=null&&v!=='').map(([id,v])=>{const f=state.fields.find(x=>x.id===id); if(!f) return ''; if(f.type==='text') return `<b>${f.name}:</b> ${String(v).slice(0,120)}`; if(f.type==='boolean') return `<b>${f.name}:</b> ${v?'På':'Av'}`; return `<b>${f.name}:</b> ${v}`;}).join(' • '); if(!parts) return; const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div style="flex:1"><b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b><div class="small muted">${parts}</div></div><button class="btn small" data-open="${d}">Åpne</button>`; row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); }; history14.appendChild(row);});
+      const dates=lastNDates(14).reverse();
+      miniCards.innerHTML='';
+      state.fields.filter(f=>f.type==='number').forEach(f=>{
+        const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
+        const avg=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null;
+        const el=document.createElement('div'); el.className='item';
+        el.innerHTML=`<div style="flex:1"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div>${avg!=null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`;
+        miniCards.appendChild(el);
+      });
+      const sel=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse();
+      history14.innerHTML='';
+      sel.forEach(d=>{
+        const vals=getEntry(d);
+        const parts=Object.entries(vals).filter(([_,v])=>v!=null&&v!=='').map(([id,v])=>{
+          const f=state.fields.find(x=>x.id===id); if(!f) return '';
+          if(f.type==='text') return `<b>${f.name}:</b> ${String(v).slice(0,120)}`;
+          if(f.type==='boolean') return `<b>${f.name}:</b> ${v?'På':'Av'}`;
+          return `<b>${f.name}:</b> ${v}`;
+        }).join(' • ');
+        if(!parts) return;
+        const p=computeProgress(d);
+        const row=document.createElement('div'); row.className='item';
+        row.innerHTML=`<div style="flex:1">
+            <b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b>
+            <div class="small muted">${parts}</div>
+          </div>
+          <div class="small" style="text-align:right">
+            <div>${p.done}/${p.total}</div>
+            <div class="hearts">${renderHearts(p.pct)}</div>
+            <button class="btn small" data-open="${d}" style="margin-top:6px">Åpne</button>
+          </div>`;
+        row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
+        history14.appendChild(row);
+      });
     }
+
+    // ===== Feltliste / quick-add =====
     function renderFieldList(){
       const box=$('fieldsList'); box.innerHTML='';
       state.fields.forEach(f=>{
@@ -328,20 +485,61 @@
         box.appendChild(w);
       });
     }
-    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
+    function bindQuickAdd(){
+      const map={
+        sleep_score:{id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left'},
+        sleep_hours:{id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,axisHint:'right'},
+        workout_min:{id:'workout_min',name:'Trening (min)',type:'number',goal:30,includeInProgress:true,axisHint:'right'},
+        read_min:{id:'read_min',name:'Lese (min)',type:'number',goal:20,includeInProgress:false,axisHint:'right'},
+        gratitude:{id:'gratitude',name:'Takknemlighet',type:'text',includeInProgress:false}
+      };
+      document.querySelectorAll('#quickAdd .chip').forEach(c=>{
+        c.onclick=async()=>{
+          const key=c.getAttribute('data-quick'); const t=map[key]; if(!t) return;
+          // unngå duplikat
+          if(state.fields.some(f=>f.id===t.id)){ alert('Finnes allerede'); return; }
+          await pushField({...t,updatedAt:Date.now()}); renderAll();
+        };
+      });
+    }
 
     // ===== CRUD =====
-    async function pushField(f){ const val={...f,updatedAt:f.updatedAt||Date.now()}; await idbSet('fields',val); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('fields').doc(val.id).set(val,{merge:true}); await u.collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{}); await idbDelete('tombstones',`field:${val.id}`);} }
-    async function pushEntry(date,values){ if(isEmptyEntry(values)){ await markEntryDeleted(date); renderAll(); return; } const val={date,values,updatedAt:Date.now()}; await idbSet('entries',val); await idbDelete('tombstones',`entry:${date}`); if(fb.enabled && state.uid){ const u=fb.db.collection('users').doc(state.uid); await u.collection('entries').doc(date).set(val,{merge:true}); await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});} }
+    async function pushField(f){
+      const val={...f,updatedAt:f.updatedAt||Date.now()};
+      await idbSet('fields',val);
+      if(fb.enabled && state.uid){
+        const u=fb.db.collection('users').doc(state.uid);
+        await u.collection('fields').doc(val.id).set(val,{merge:true});
+        await u.collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{});
+        await idbDelete('tombstones',`field:${val.id}`);
+      }
+    }
+    async function pushEntry(date,values){
+      if(isEmptyEntry(values)){ await markEntryDeleted(date); renderAll(); return; }
+      const val={date,values,updatedAt:Date.now()};
+      await idbSet('entries',val);
+      await idbDelete('tombstones',`entry:${date}`);
+      if(fb.enabled && state.uid){
+        const u=fb.db.collection('users').doc(state.uid);
+        await u.collection('entries').doc(date).set(val,{merge:true});
+        await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
+      }
+    }
 
-    // ===== Bind & Boot =====
+    // ===== Binding + Render =====
+    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
     function bindUI(){
       $('btnLogin').addEventListener('click',signIn);
       $('btnLogout').onclick=signOut;
       $('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download="livstracker-export.json";a.click();URL.revokeObjectURL(url)};
       $('btnImport').onclick=()=>$('fileInput').click();
       $('fileInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{const data=JSON.parse(t); state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();});};
-      $('btnAddField').onclick=async()=>{ const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked}; const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g); await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll(); };
+      $('btnAddField').onclick=async()=>{
+        const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked};
+        const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g);
+        await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll();
+      };
+      bindQuickAdd();
       $('btnToggleHistory').onclick=()=>{state.historyExpanded=!state.historyExpanded; render14();};
       $('period').onchange=renderChart; $('axisMap').onchange=e=>{state.axisMapMode=e.target.value; renderChart();}; $('showGoals').onchange=renderChart;
       const upd=()=>{const on=navigator.onLine; $('net').textContent=on?'Online':'Offline'; $('net').className='small '+(on?'':'muted')}; upd(); addEventListener('online',upd); addEventListener('offline',upd);
@@ -350,14 +548,21 @@
       $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
     }
 
+    // ===== Boot =====
     window.addEventListener('load', async ()=>{
       await idbOpen();
       const fs=await idbGetAll('fields'); state.fields=[...new Map(fs.map(f=>[f.id,f])).values()];
       const es=await idbGetAll('entries'); state.entries=Object.fromEntries(es.map(x=>[x.date,x.values]));
-      $('sdkChip').title='Hvis login ikke fester: sjekk Authorized domains (localhost/127.0.0.1/LAN/Vercel) og cookies';
-      bindUI(); state.currentDate=todayISO(); renderAll();
+      bindUI(); state.currentDate=todayISO();
 
-      // Prøv å initialisere, men login-knappen gjør det uansett ved klikk
+      // Defaults hvis tomt
+      if(!state.fields.length){
+        await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left',updatedAt:Date.now()});
+        await pushField({id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,axisHint:'right',updatedAt:Date.now()});
+      }
+
+      renderAll();
+      $('sdkChip').title='Hvis login ikke fester: sjekk Authorized domains (localhost/127.0.0.1/LAN/Vercel) og cookies';
       try{ await ensureFirebaseReady(); }catch(e){ showBar('Init-feil: '+(e?.message||e)); }
     });
 
