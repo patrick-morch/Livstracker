@@ -4,67 +4,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Livstracker – felt, mål, graf og 14-dagers oversikt</title>
+  <title>Livstracker – enklere oversikt</title>
   <style>
-    /* ===== Design tokens (tema/tetthet) ===== */
     :root{
       --radius: 14px; --gap: 16px; --font: 14px/1.5 system-ui,Inter,Roboto,sans-serif;
       --bg:#0b0d10; --card:#11151a; --surface:#0f131a;
       --text:#e7e7e7; --muted:#9aa4af; --border:#1d232c; --accent:#5aa7ff;
-      --ring: 0 0 0 2px rgba(90,167,255,.35);
-      --shadow: 0 8px 24px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.02) inset;
-      --chip-border:#2a3342;
+      --ring: 0 0 0 2px rgba(90,167,255,.35); --shadow: 0 8px 24px rgba(0,0,0,.35);
       --ok:#22c55e; --warn:#eab308; --bad:#ef4444;
     }
     :root[data-theme="light"]{
-      --bg:#f6f7f9; --card:#ffffff; --surface:#ffffff;
+      --bg:#f6f7f9; --card:#fff; --surface:#fff;
       --text:#0a0c10; --muted:#5b636e; --border:#dfe3ea; --accent:#2563eb;
-      --ring: 0 0 0 2px rgba(37,99,235,.25);
-      --shadow: 0 8px 28px rgba(16,24,40,.08), 0 1px 0 rgba(16,24,40,.04);
-      --chip-border:#e5e9f0;
+      --ring: 0 0 0 2px rgba(37,99,235,.25); --shadow: 0 8px 28px rgba(16,24,40,.08);
     }
     :root[data-density="compact"]{ --gap: 10px; --radius: 10px; }
 
     *{box-sizing:border-box} body{margin:0; font:var(--font); background:var(--bg); color:var(--text)}
-    header{position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); background:color-mix(in oklab, var(--bg) 80%, transparent); backdrop-filter: blur(10px);}
+    header{position:sticky; top:0; z-index:10; display:flex; gap:10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); background:color-mix(in oklab, var(--bg) 80%, transparent); backdrop-filter: blur(10px);}
     h1{font-size:16px; margin:0}
-    .container{max-width:1200px; margin:0 auto; padding:0 16px}
+    .container{max-width:1100px; margin:0 auto; padding:0 16px}
     main{padding:var(--gap) 0; display:grid; gap:var(--gap); grid-template-columns: repeat(12, minmax(0,1fr));}
     .span-12{grid-column:span 12}
-    @media (max-width:1200px){ main{grid-template-columns:repeat(9,1fr)} }
-    @media (max-width:960px){  main{grid-template-columns:repeat(6,1fr)} .span-12{grid-column:span 6} }
-    @media (max-width:640px){  main{grid-template-columns:repeat(4,1fr)} .span-12{grid-column:span 4} }
-
+    @media (max-width:960px){ main{grid-template-columns:repeat(6,1fr)} .span-12{grid-column:span 6} }
     .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:calc(var(--gap) - 2px); box-shadow:var(--shadow)}
     .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
     .muted{color:var(--muted)} .small{font-size:12px}
-    .btn{padding:8px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:10px; cursor:pointer; transition:transform .04s, background .2s, border-color .2s}
-    .btn:hover{transform:translateY(-1px)} .btn:active{transform:translateY(0)} .btn.ghost{background:transparent}
-    .btn.primary{background:var(--accent); border-color:transparent; color:white}
-    .btn.danger{background:#b91c1c; color:white; border-color:#7f1d1d}
-    .btn:focus-visible{outline:none; box-shadow:var(--ring)}
+    .btn{padding:8px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:10px; cursor:pointer; transition:transform .04s}
+    .btn:hover{transform:translateY(-1px)} .btn.ghost{background:transparent}
+    .btn.primary{background:var(--accent); color:#fff; border-color:transparent}
+    .btn.danger{background:#b91c1c; color:#fff; border-color:#7f1d1d}
     .input,.select,textarea{background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:10px}
-    .input:focus-visible,.select:focus-visible,textarea:focus-visible{outline:none; box-shadow:var(--ring)}
+    .input:focus-visible,.select:focus-visible,textarea:focus-visible,.btn:focus-visible{outline:none; box-shadow:var(--ring)}
     label{display:flex; flex-direction:column; gap:6px}
-    .legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
-    .chip{padding:6px 10px; border-radius:999px; border:1px solid var(--chip-border); cursor:pointer}
-    .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:var(--gap)}
-    @media (max-width:960px){ .grid-2{grid-template-columns:1fr} }
 
-    /* små UI badges */
-    .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); background:var(--surface)}
-    .pill.ok{border-color:color-mix(in oklab, var(--ok) 60%, var(--border))}
-    .pill.bad{border-color:color-mix(in oklab, var(--bad) 60%, var(--border))}
-    .kpi{font-weight:600}
+    /* segment for boolean */
+    .seg{display:inline-flex; border:1px solid var(--border); border-radius:999px; overflow:hidden}
+    .seg button{border:0; background:transparent; padding:6px 12px; cursor:pointer}
+    .seg button[aria-pressed="true"]{background:var(--accent); color:#fff}
 
-    /* tabell-ish for 14d */
+    /* list / items */
     .list{display:grid; gap:8px}
     .item{display:flex; align-items:center; gap:10px; border:1px dashed var(--border); border-radius:10px; padding:8px 10px; background:color-mix(in oklab, var(--card) 94%, transparent)}
-    .item .date{min-width:92px; font-variant-numeric:tabular-nums}
     .grow{flex:1}
+
+    /* streak */
+    .streak{display:flex; gap:6px}
+    .dot{width:14px; height:14px; border-radius:4px; border:1px solid var(--border); background:color-mix(in oklab, var(--surface) 80%, transparent)}
+    .dot.ok{background:color-mix(in oklab, var(--ok) 55%, var(--surface))}
+    .dot.mid{background:color-mix(in oklab, var(--warn) 55%, var(--surface))}
+    .dot.bad{background:color-mix(in oklab, var(--bad) 55%, var(--surface))}
+
+    /* mini-kort for felt */
+    .mini{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:10px}
+    @media (max-width:960px){.mini{grid-template-columns:1fr 1fr}}
+    .kpi{font-weight:600}
+
+    /* kalender-popover */
+    .popover{position:relative}
+    .popover-panel{position:absolute; top:38px; right:0; z-index:20; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; box-shadow:var(--shadow)}
+    .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px}
+    .cal .hd{font-size:12px; color:var(--muted); text-align:center}
+    .cal button{padding:6px 0; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:8px; cursor:pointer}
+    .cal button.sel{outline:2px solid var(--accent)}
+    .cal .muted-day{opacity:.45}
   </style>
 
-  <!-- Vendor (uendret) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
@@ -74,14 +79,12 @@
   <header>
     <div class="container" style="display:flex;align-items:center;gap:10px">
       <h1>Livstracker</h1>
-      <span id="net" class="small muted"></span>
-      <span class="muted">·</span>
-      <span id="syncStatus" class="small muted">Ikke pålogget</span>
+      <span id="net" class="small muted"></span><span class="muted">·</span><span id="syncStatus" class="small muted">Ikke pålogget</span>
       <div style="flex:1"></div>
       <button id="btnTheme" class="btn ghost">Tema</button>
       <button id="btnDensity" class="btn ghost">Tetthet</button>
-      <button id="btnImport" class="btn">Importer JSON</button>
-      <button id="btnExport" class="btn ghost">Eksporter JSON</button>
+      <button id="btnImport" class="btn">Importer</button>
+      <button id="btnExport" class="btn ghost">Eksporter</button>
       <button id="btnLogin" class="btn">Logg inn</button>
       <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
     </div>
@@ -89,86 +92,94 @@
 
   <div class="container">
     <main>
-      <!-- Feltbygger + Dagens oversikt -->
-      <section class="span-12 grid-2">
-        <!-- Felt -->
-        <div class="card">
-          <h2 style="margin:0 0 8px 0">Felt</h2>
-          <div class="row" style="margin-bottom:10px">
-            <label style="min-width:200px">Navn
-              <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" />
-            </label>
-            <label>Type
-              <select id="f_type" class="select">
-                <option value="number">Tall</option>
-                <option value="boolean">Av/på</option>
-                <option value="text">Tekst</option>
-              </select>
-            </label>
-            <label>Mål (kun tall)
-              <input id="f_goal" class="input" type="number" step="any" placeholder="f.eks. 8" />
-            </label>
-            <label style="margin-top:22px; flex-direction:row; align-items:center; gap:8px">
-              <input id="f_include" type="checkbox" /> Ta med i fremdrift
-            </label>
-          </div>
-          <div class="row">
-            <button id="btnAddField" class="btn primary">Legg til felt</button>
-            <button id="btnPresets" class="btn">Forhåndsoppsett</button>
-            <button id="btnDeleteAll" class="btn danger">Slett alt</button>
-          </div>
-          <div id="fieldsList" style="margin-top:14px; display:grid; gap:10px"></div>
+      <!-- Feltbygger -->
+      <section class="card span-12">
+        <h2 style="margin:0 0 8px 0">Felt</h2>
+        <div class="row" style="margin-bottom:10px">
+          <label style="min-width:200px">Navn
+            <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" />
+          </label>
+          <label>Type
+            <select id="f_type" class="select">
+              <option value="number">Tall</option>
+              <option value="boolean">Av/på</option>
+              <option value="text">Tekst</option>
+            </select>
+          </label>
+          <label>Mål (kun tall)
+            <input id="f_goal" class="input" type="number" step="any" placeholder="f.eks. 30" />
+          </label>
+          <label style="margin-top:22px; flex-direction:row; align-items:center; gap:8px">
+            <input id="f_include" type="checkbox" /> Ta med i fremdrift
+          </label>
         </div>
+        <div class="row">
+          <button id="btnAddField" class="btn primary">Legg til felt</button>
+          <button id="btnPresets" class="btn">Forhåndsoppsett</button>
+          <button id="btnDeleteAll" class="btn danger">Slett alt</button>
+        </div>
+        <div id="fieldsList" class="list" style="margin-top:14px"></div>
+      </section>
 
-        <!-- Dagens oversikt -->
+      <!-- Registrering + Graf -->
+      <section class="span-12" style="display:grid; grid-template-columns:1.2fr 1fr; gap:var(--gap)">
         <div class="card">
           <div class="row" style="justify-content:space-between">
-            <h2 style="margin:0">Dagens oversikt</h2>
-            <div class="pill"><span id="todayDate"></span><span class="muted">•</span><span class="small">Autosaves</span></div>
+            <h2 style="margin:0">Registrering</h2>
+            <div class="row">
+              <label style="gap:4px">Dato
+                <input id="dateInput" class="input" type="date" />
+              </label>
+              <div class="popover">
+                <button id="btnCal" class="btn">Kalender</button>
+                <div id="calPanel" class="popover-panel" style="display:none">
+                  <div class="row" style="justify-content:space-between">
+                    <button id="calPrev" class="btn">‹</button>
+                    <div id="calTitle" style="font-weight:600"></div>
+                    <button id="calNext" class="btn">›</button>
+                  </div>
+                  <div class="cal" id="calGrid"></div>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="todaySummary" class="list" style="margin-top:10px"></div>
-          <hr style="border:none; border-top:1px solid var(--border); margin:12px 0">
-          <h3 style="margin:0 0 6px 0">Graf</h3>
-          <div class="row">
-            <div id="fieldChips" class="legend"></div>
-            <div style="flex:1"></div>
-            <label>Periode
-              <select id="period" class="select">
-                <option value="7d">Uke</option><option value="30d">Måned</option><option value="365d">År</option><option value="all">Alt</option>
-              </select>
-            </label>
-            <label>Agg
-              <select id="agg" class="select"><option value="avg">Snitt</option><option value="sum">Sum</option></select>
-            </label>
-            <label>Gruppering
-              <select id="grouping" class="select"><option value="day">Dag</option><option value="week">Uke</option><option value="month">Måned</option></select>
-            </label>
-            <label>Glatting
-              <select id="smooth" class="select"><option value="none">Av</option><option value="ma7">7d</option><option value="ma28">28d</option></select>
-            </label>
-            <label>Akse
-              <select id="axisMap" class="select"><option value="auto">Auto</option><option value="manual">Manuell</option></select>
-            </label>
-            <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:20px">
-              <input type="checkbox" id="showGoals" /> Vis mål-linjer
-            </label>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between; align-items:baseline">
+            <h2 style="margin:0">Graf</h2>
+            <div class="row">
+              <label>Periode
+                <select id="period" class="select">
+                  <option value="14d">14 dager</option>
+                  <option value="30d">30 dager</option>
+                  <option value="365d">1 år</option>
+                  <option value="all">Alt</option>
+                </select>
+              </label>
+              <label>Akse
+                <select id="axisMap" class="select">
+                  <option value="auto">Auto</option>
+                  <option value="manual">Manuell</option>
+                </select>
+              </label>
+              <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:20px">
+                <input type="checkbox" id="showGoals" /> Mål-linjer
+              </label>
+            </div>
           </div>
+          <canvas id="chart" height="110"></canvas>
+          <div id="legend" class="list"></div>
+          <div class="small muted">Kun tallfelt vises i grafen</div>
         </div>
       </section>
 
-      <!-- Graf -->
-      <section class="card span-12" style="grid-column:span 12">
-        <canvas id="chart" height="120"></canvas>
-        <div id="legend" class="legend"></div>
-        <div class="small muted">Venstre: 0–100 · Høyre: 0–10</div>
-      </section>
-
-      <!-- 14 dager -->
+      <!-- 14 dager (kompakt) -->
       <section class="card span-12">
-        <div class="row" style="justify-content:space-between; align-items:baseline">
-          <h2 style="margin:0">Siste 14 dager</h2>
-          <span class="small muted">Tallfelt viser progresjon mot mål der det finnes</span>
-        </div>
+        <h2 style="margin:0 0 6px 0">Siste 14 dager</h2>
+        <div id="streak" class="streak" style="margin-bottom:8px"></div>
+        <div id="miniCards" class="mini"></div>
         <div id="history14" class="list" style="margin-top:10px"></div>
       </section>
     </main>
@@ -177,69 +188,56 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none" />
 
   <script>
-    // ==== Firebase config (uendret) ====
-    const FIREBASE_CONFIG = {
-      apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
-      authDomain: "livstracker.firebaseapp.com",
-      projectId: "livstracker",
-      storageBucket: "livstracker.firebasestorage.app",
-      messagingSenderId: "885451038080",
-      appId: "1:885451038080:web:3df131af07a258a5bc7565"
-    };
+    /* --------- Konfig & utils --------- */
+    const FIREBASE_CONFIG = { apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg", authDomain:"livstracker.firebaseapp.com", projectId:"livstracker", storageBucket:"livstracker.firebasestorage.app", messagingSenderId:"885451038080", appId:"1:885451038080:web:3df131af07a258a5bc7565" };
+    const todayISO = () => new Date().toISOString().slice(0,10);
+    const iso = d => new Date(d).toISOString().slice(0,10);
+    const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;}
+    const lastNDates=n=>{const out=[]; const base=new Date(); for(let i=0;i<n;i++) out.push(iso(addDays(base,-i))); return out;}
+    const uid = ()=>'id_'+Math.random().toString(36).slice(2,10);
 
-    // ==== Tema/Tetthet UI (kun lokalt) ====
-    (function initLookAndFeel(){
-      const themeKey='lt_theme', densityKey='lt_density', root=document.documentElement;
-      function applyTheme(v){ root.setAttribute('data-theme', v); localStorage.setItem(themeKey,v); }
-      function applyDensity(v){ root.setAttribute('data-density', v); localStorage.setItem(densityKey,v); }
-      applyTheme(localStorage.getItem(themeKey)||'auto');
-      applyDensity(localStorage.getItem(densityKey)||'comfortable');
+    /* Tema/tetthet (lokal) */
+    (function(){
+      const root=document.documentElement, tk='lt_theme', dk='lt_density';
+      const setT=v=>{root.setAttribute('data-theme',v); localStorage.setItem(tk,v);}
+      const setD=v=>{root.setAttribute('data-density',v); localStorage.setItem(dk,v);}
+      setT(localStorage.getItem(tk)||'auto'); setD(localStorage.getItem(dk)||'comfortable');
       window.addEventListener('DOMContentLoaded', ()=>{
         const bt=document.getElementById('btnTheme'), bd=document.getElementById('btnDensity');
-        if(bt){ bt.onclick=()=>{ const cur=root.getAttribute('data-theme'); const next=cur==='auto'?'dark':cur==='dark'?'light':'auto'; applyTheme(next); bt.textContent='Tema: '+next; }; bt.textContent='Tema: '+root.getAttribute('data-theme'); }
-        if(bd){ bd.onclick=()=>{ const cur=root.getAttribute('data-density'); const next=cur==='comfortable'?'compact':'comfortable'; applyDensity(next); bd.textContent='Tetthet: '+(next==='compact'?'Kompakt':'Komfort'); }; bd.textContent='Tetthet: '+(root.getAttribute('data-density')==='compact'?'Kompakt':'Komfort'); }
+        bt.onclick=()=>{const c=root.getAttribute('data-theme'); const n=c==='auto'?'dark':c==='dark'?'light':'auto'; setT(n); bt.textContent='Tema: '+n;}
+        bd.onclick=()=>{const c=root.getAttribute('data-density'); const n=c==='comfortable'?'compact':'comfortable'; setD(n); bd.textContent='Tetthet: '+(n==='compact'?'Kompakt':'Komfort');}
+        bt.textContent='Tema: '+root.getAttribute('data-theme'); bd.textContent='Tetthet: '+(root.getAttribute('data-density')==='compact'?'Kompakt':'Komfort');
       });
     })();
 
-    // ==== Dato / utils ====
-    const todayISO = () => new Date().toISOString().slice(0,10);
-    const iso = d => new Date(d).toISOString().slice(0,10);
-    const addDays = (d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;};
-    const lastNDates = (n)=>{ const out=[]; const base=new Date(); for(let i=0;i<n;i++) out.push(iso(addDays(base,-i))); return out; };
-
-    // ==== IndexedDB (local-first) ====
+    /* IndexedDB */
     const DB_NAME='livstracker', DB_VERSION=1; let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result;
-        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
-        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
-      }; rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
+      rq.onupgradeneeded=()=>{const d=rq.result; if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'}); if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});};
+      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
     });}
-    const idbGetAll = (store)=>new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
-    const idbSet = (store,val)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
-    const idbDelete = (store,key)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
+    const idbGetAll=store=>new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
+    const idbSet=(store,val)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
+    const idbDelete=(store,key)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
 
-    // ==== App-state ====
-    let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[] };
+    /* App-state */
+    let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[], currentDate: todayISO() };
 
-    // ==== Firebase handles ====
-    let fb = { enabled:false, app:null, auth:null, db:null };
+    /* Firebase (uendret) */
+    let fb={enabled:false, app:null, auth:null, db:null};
     async function tryInitFirebase(){
-      if (!FIREBASE_CONFIG?.apiKey) return;
-      if (!window.firebase) throw new Error("Firebase SDK ikke lastet");
-      fb.app  = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth = firebase.auth();
-      fb.db   = firebase.firestore();
-      fb.enabled = true;
-      fb.auth.useDeviceLanguage();
-      await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      try { await fb.auth.getRedirectResult(); } catch (e) { console.warn("getRedirectResult error:", e?.code, e?.message); alert(`Redirect-feil: ${e?.code || ""} ${e?.message || e}`); }
-      try { await fb.db.enablePersistence({ synchronizeTabs:true }); } catch(e) {}
+      if(!FIREBASE_CONFIG?.apiKey) return;
+      if(!window.firebase) throw new Error("Firebase SDK ikke lastet");
+      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
+      fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true;
+      fb.auth.useDeviceLanguage(); await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      try{await fb.auth.getRedirectResult();}catch(e){console.warn(e); }
+      try{await fb.db.enablePersistence({synchronizeTabs:true});}catch(e){}
     }
-    async function signIn(){ if(!fb.enabled) return alert('Firebase ikke konfigurert.'); const p=new firebase.auth.GoogleAuthProvider(); try{await fb.auth.signInWithPopup(p);}catch(e){const c=e?.code||""; if(c.includes("popup")||c.includes("operation-not-supported")||c.includes("web-storage-unsupported")){await fb.auth.signInWithRedirect(p); return;} alert(`Login-feil: ${e?.code||""} ${e?.message||e}`);}}
-    async function signOut(){ try { if(fb.enabled) await fb.auth.signOut(); } catch(e){} }
+    async function signIn(){ if(!fb.enabled) return alert('Firebase ikke konfigurert.'); const p=new firebase.auth.GoogleAuthProvider(); try{await fb.auth.signInWithPopup(p);}catch(e){ if((e?.code||'').includes('popup')) return fb.auth.signInWithRedirect(p); alert(e?.message||e);} }
+    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){} }
 
-    // ==== Synk: sky <-> lokal (uendret) ====
+    /* Synk */
     let unsubFields=null, unsubEntries=null, firstUploaded=false;
     async function collectionHasAny(uid){
       const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
@@ -247,35 +245,29 @@
       return !f.empty || !e.empty;
     }
     async function uploadAllLocal(uid){
-      const batch=fb.db.batch(); const uref=fb.db.collection('users').doc(uid);
-      state.fields.forEach(f=>batch.set(uref.collection('fields').doc(f.id), {...f,updatedAt:Date.now()},{merge:true}));
-      Object.entries(state.entries).forEach(([date,values])=>batch.set(uref.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true}));
+      const batch=fb.db.batch(); const u=fb.db.collection('users').doc(uid);
+      state.fields.forEach(f=>batch.set(u.collection('fields').doc(f.id), {...f,updatedAt:Date.now()},{merge:true}));
+      Object.entries(state.entries).forEach(([date,values])=>batch.set(u.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true}));
       await batch.commit();
     }
     async function startSync(uid){
-      if(!firstUploaded){
-        const hasAny=await collectionHasAny(uid);
-        if(!hasAny) await uploadAllLocal(uid);
-        firstUploaded=true;
-      }
+      if(!firstUploaded){ if(!await collectionHasAny(uid)) await uploadAllLocal(uid); firstUploaded=true; }
       if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
 
-      unsubFields = fb.db.collection('users').doc(uid).collection('fields')
-        .onSnapshot(async snap=>{
-          const byId=new Map(); snap.forEach(d=>{const v=d.data(); byId.set(v.id,v);});
-          state.fields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
-          for(const f of state.fields) await idbSet('fields', f);
-          renderAll();
-        });
-
-      unsubEntries = fb.db.collection('users').doc(uid).collection('entries')
-        .onSnapshot(async snap=>{
-          const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
-          state.entries=all;
-          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
-          renderAll();
-        });
+      unsubFields = fb.db.collection('users').doc(uid).collection('fields').onSnapshot(async s=>{
+        const m=new Map(); s.forEach(d=>{const v=d.data(); m.set(v.id,v);});
+        state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
+        for(const f of state.fields) await idbSet('fields',f);
+        renderAll();
+      });
+      unsubEntries = fb.db.collection('users').doc(uid).collection('entries').onSnapshot(async s=>{
+        const all={}; s.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
+        state.entries=all;
+        for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+        renderAll();
+      });
     }
+
     async function pushField(f){
       await idbSet('fields', f);
       if(fb.enabled && state.uid){
@@ -283,15 +275,12 @@
       }
     }
     async function deleteField(id){
-      state.fields = state.fields.filter(f=>f.id!==id);
+      state.fields=state.fields.filter(f=>f.id!==id);
       await idbDelete('fields', id);
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('fields').doc(id).delete().catch(()=>{});
       }
-      // Fjern verdier i eksisterende entries
-      for(const [d,vals] of Object.entries(state.entries)){
-        if(id in vals){ delete vals[id]; await pushEntry(d, vals); }
-      }
+      for(const [d,vals] of Object.entries(state.entries)){ if(id in vals){ delete vals[id]; await pushEntry(d, vals); } }
       renderAll();
     }
     async function pushEntry(date, values){
@@ -301,47 +290,22 @@
       }
     }
 
-    // ==== Import/Eksport (uendret) ====
-    function exportJSON(){
-      const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url);
-    }
-    async function importJSON(file){
-      const text=await file.text(); const data=JSON.parse(text);
-      const byId=new Map(state.fields.map(f=>[f.id,f]));
-      (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()}));
-      state.fields=[...byId.values()];
-      for(const f of state.fields) await pushField(f);
-      for(const [d,vals] of Object.entries(data.entries||{})) await pushEntry(d, vals);
-      renderAll(); alert('Import fullført');
-    }
-
-    // ==== App helpers ====
-    const uid = ()=>'id_'+Math.random().toString(36).slice(2,10);
+    /* App helpers */
     const getEntry = (date)=> state.entries[date] || {};
     async function setEntryValue(date, fieldId, value){
-      const cur = {...getEntry(date), [fieldId]: value};
-      state.entries[date]=cur;
-      await pushEntry(date, cur);
+      const cur={...getEntry(date), [fieldId]: value};
+      state.entries[date]=cur; await pushEntry(date, cur);
       renderToday(); renderChart(); renderHistory14();
     }
     async function upsertField({id,name,type,goal,includeInProgress,axisHint}){
       const f={id:id||uid(), name:name?.trim()||'Uten navn', type:type||'number', goal: type==='number' && goal!=='' ? Number(goal) : undefined, includeInProgress: !!includeInProgress, axisHint: axisHint|| (type==='number'?'right':undefined), updatedAt: Date.now()};
-      const idx=state.fields.findIndex(x=>x.id===f.id);
-      if(idx>=0) state.fields[idx]={...state.fields[idx],...f}; else state.fields.push(f);
-      await pushField(idx>=0?state.fields[idx]:f);
-      renderAll();
+      const i=state.fields.findIndex(x=>x.id===f.id); if(i>=0) state.fields[i]={...state.fields[i],...f}; else state.fields.push(f);
+      await pushField(i>=0?state.fields[i]:f); renderAll();
     }
 
-    // ==== Graf-helpers ====
-    function dateRange(period){ if(period==='all')return null; const map={'7d':7,'30d':30,'365d':365}; return addDays(new Date(),-map[period]); }
-    function groupKey(d,mode){ const x=new Date(d);
-      if(mode==='week'){ const day=(x.getUTCDay()+6)%7; const monday=new Date(Date.UTC(x.getUTCFullYear(),x.getUTCMonth(),x.getUTCDate()-day)); return monday.toISOString().slice(0,10); }
-      if(mode==='month') return `${x.getUTCFullYear()}-${String(x.getUTCMonth()+1).padStart(2,'0')}-01`;
-      return iso(x);
-    }
-    function movingAvg(arr,win){ const out=[]; let sum=0,q=[]; for(const v of arr){ q.push(v??0); sum+=v??0; if(q.length>win) sum-=q.shift(); out.push(q.length===win?sum/win:null);} return out; }
+    /* Graf helpers: auto gruppering */
+    function dateRange(period){ if(period==='all')return null; const map={'14d':14,'30d':30,'365d':365}; return addDays(new Date(),-map[period]); }
+    function groupKey(d,mode){ const x=new Date(d); if(mode==='week'){ const day=(x.getUTCDay()+6)%7; const monday=new Date(Date.UTC(x.getUTCFullYear(),x.getUTCMonth(),x.getUTCDate()-day)); return monday.toISOString().slice(0,10);} return iso(x); }
     function pickAxis(field){
       if(state.axisMapMode==='manual' && field.axisHint) return field.axisHint==='left'?'y':'y1';
       const n=(field.name||'').toLowerCase();
@@ -350,46 +314,41 @@
       return (typeof field.goal==='number' && field.goal>10)?'y':'y1';
     }
 
-    // ==== Chart.js ====
+    /* Chart.js */
     let chart;
-    function buildDatasets(dates, fields, matrix, smoothMode, showGoals){
+    function buildDatasets(dates, fields, matrix, showGoals){
       const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
       const ds=[]; const seen=new Set();
       fields.forEach((f,idx)=>{
-        if(f.type!=='number') return; // kun tall i graf
-        if(seen.has(f.id)) return; seen.add(f.id);
+        if(f.type!=='number' || seen.has(f.id)) return; seen.add(f.id);
         const raw=dates.map(d=>(matrix[d]&&typeof matrix[d][f.id]!=='undefined')?Number(matrix[d][f.id]):null);
-        const data=smoothMode==='ma7'?movingAvg(raw,7):smoothMode==='ma28'?movingAvg(raw,28):raw;
         const axis=pickAxis(f);
-        ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[idx%colors.length],backgroundColor:colors[idx%colors.length]+'33',pointRadius:0,tension:.25});
-        if(showGoals && typeof f.goal==='number'){
-          ds.push({label:f.name+' mål',data:dates.map(()=>f.goal),yAxisID:axis,borderColor:colors[idx%colors.length],borderDash:[6,6],pointRadius:0,tension:0});
-        }
+        ds.push({label:f.name,data:raw,yAxisID:axis,borderColor:colors[idx%colors.length],backgroundColor:colors[idx%colors.length]+'33',pointRadius:0,tension:.25});
+        if(showGoals && typeof f.goal==='number'){ ds.push({label:f.name+' mål',data:dates.map(()=>f.goal),yAxisID:axis,borderColor:colors[idx%colors.length],borderDash:[6,6],pointRadius:0,tension:0}); }
       });
       return ds;
     }
     function renderChart(){
-      const period=periodEl.value, grouping=groupingEl.value, agg=aggEl.value, smooth=smoothEl.value, showGoals=showGoalsEl.checked;
+      const period=periodEl.value, showGoals=showGoalsEl.checked;
       const since=dateRange(period);
+      const autoGrouping = (period==='365d' || period==='all') ? 'week' : 'day';
       const datesAll=Object.keys(state.entries).sort();
       const dates=datesAll.filter(d=>!since || new Date(d)>=since);
-
       const groups={};
       for(const d of dates){
-        const g=groupKey(d,grouping); groups[g]??={};
+        const g=groupKey(d,autoGrouping); groups[g]??={};
         const vals=state.entries[d]||{};
         state.fields.forEach(f=>{ const v=vals[f.id]; if(typeof v==='undefined') return; (groups[g][f.id]??=[]).push(f.type==='number'?Number(v):null); });
       }
       const labels=Object.keys(groups).sort();
-      const matrix={}; for(const g of labels){ matrix[g]={}; state.fields.forEach(f=>{ if(f.type!=='number'){ matrix[g][f.id]=null; return; } const arr=groups[g][f.id]||[]; matrix[g][f.id]=arr.length?(agg==='sum'?arr.reduce((a,b)=>a+b,0):arr.reduce((a,b)=>a+b,0)/arr.length):null; }); }
+      const matrix={}; for(const g of labels){ matrix[g]={}; state.fields.forEach(f=>{ if(f.type!=='number'){ matrix[g][f.id]=null; return; } const arr=(groups[g][f.id]||[]).filter(v=>typeof v==='number'); matrix[g][f.id]=arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null; }); }
 
       const selected = state.selectedFields.length ? new Set(state.selectedFields) : new Set(state.fields.filter(f=>f.type==='number').map(f=>f.id));
       const fields = state.fields.filter(f=>selected.has(f.id));
 
-      const datasets=buildDatasets(labels, fields, matrix, smooth, showGoals);
       if(chart) chart.destroy();
-      const cs = getComputedStyle(document.documentElement);
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets},options:{
+      const cs=getComputedStyle(document.documentElement);
+      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:buildDatasets(labels,fields,matrix,showGoals)},options:{
         responsive:true,animation:false,interaction:{mode:'nearest',intersect:false},
         plugins:{legend:{display:true,position:'bottom'}},
         scales:{
@@ -399,45 +358,37 @@
         }
       }});
 
-      // valgchips over graf
       legendEl.innerHTML='';
-      const chips=document.getElementById('fieldChips'); chips.innerHTML='';
-      state.fields.forEach(f=>{
-        if(f.type!=='number') return;
-        const chip=document.createElement('div'); chip.className='chip'; chip.textContent=f.name;
-        chip.onclick=()=>{ const i=chart.data.datasets.findIndex(d=>d.label===f.name); const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål'); if(i>=0) chart.toggleDataVisibility(i); if(gi>=0) chart.toggleDataVisibility(gi); chart.update(); };
-        legendEl.appendChild(chip.cloneNode(true));
-        chips.appendChild(chip);
+      state.fields.filter(f=>f.type==='number').forEach(f=>{
+        const chip=document.createElement('div'); chip.className='item'; chip.innerHTML=`<div class="grow"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="muted small">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`;
+        chip.querySelector('button').onclick=()=>{ const i=chart.data.datasets.findIndex(d=>d.label===f.name); const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål'); if(i>=0) chart.toggleDataVisibility(i); if(gi>=0) chart.toggleDataVisibility(gi); chart.update(); };
+        legendEl.appendChild(chip);
       });
     }
 
-    // ==== UI refs ====
+    /* UI refs */
     const syncStatus=document.getElementById('syncStatus');
     const netEl=document.getElementById('net');
-    const periodEl=document.getElementById('period');
-    const groupingEl=document.getElementById('grouping');
-    const aggEl=document.getElementById('agg');
-    const smoothEl=document.getElementById('smooth');
-    const axisEl=document.getElementById('axisMap');
-    const showGoalsEl=document.getElementById('showGoals');
     const chartCtx=document.getElementById('chart').getContext('2d');
     const legendEl=document.getElementById('legend');
+    const periodEl=document.getElementById('period');
+    const axisEl=document.getElementById('axisMap');
+    const showGoalsEl=document.getElementById('showGoals');
 
-    // Felt form
     const f_name=document.getElementById('f_name');
     const f_type=document.getElementById('f_type');
     const f_goal=document.getElementById('f_goal');
     const f_include=document.getElementById('f_include');
     const fieldsList=document.getElementById('fieldsList');
 
-    // Dagens
-    const todayDateEl=document.getElementById('todayDate');
     const todaySummary=document.getElementById('todaySummary');
+    const dateInput=document.getElementById('dateInput');
 
-    // Historikk
+    const streakEl=document.getElementById('streak');
+    const miniCards=document.getElementById('miniCards');
     const history14=document.getElementById('history14');
 
-    // ==== Renderers ====
+    /* Felt-list */
     function renderFieldList(){
       fieldsList.innerHTML='';
       state.fields.forEach(f=>{
@@ -453,9 +404,7 @@
                 <option value="text" ${f.type==='text'?'selected':''}>Tekst</option>
               </select>
               <input class="input" type="number" step="any" placeholder="mål" value="${typeof f.goal==='number'?f.goal:''}" data-k="goal" style="width:110px">
-              <label style="flex-direction:row;align-items:center;gap:8px;margin:0">
-                <input type="checkbox" ${f.includeInProgress?'checked':''} data-k="includeInProgress"> I fremdrift
-              </label>
+              <label style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" ${f.includeInProgress?'checked':''} data-k="includeInProgress"> I fremdrift</label>
               <button class="btn" data-act="save">Oppdater</button>
             </div>
           </div>
@@ -473,160 +422,170 @@
       });
     }
 
-    function progressBadge(value, goal){
-      if(typeof goal!=='number') return '';
-      const pct = goal>0 ? Math.round((Number(value||0)/goal)*100) : 0;
-      const cls = pct>=100 ? 'ok':'';
-      return `<span class="pill ${cls}"><span class="kpi">${value||0}</span> / mål <b>${goal}</b> (${pct}%)</span>`;
+    /* Boolean segment (Av/På) */
+    function segToggle(val, onChange){
+      const el=document.createElement('div'); el.className='seg';
+      const off=document.createElement('button'); off.textContent='Av'; off.setAttribute('aria-pressed', String(!val));
+      const on=document.createElement('button'); on.textContent='På'; on.setAttribute('aria-pressed', String(!!val));
+      const set=(v)=>{ on.setAttribute('aria-pressed', String(!!v)); off.setAttribute('aria-pressed', String(!v)); onChange(v); }
+      off.onclick=()=>set(false); on.onclick=()=>set(true);
+      el.append(off,on); return el;
     }
 
+    /* Registrering (for valgt dato) */
     function renderToday(){
-      todayDateEl.textContent = new Date().toLocaleDateString('no-NO',{weekday:'short', day:'2-digit', month:'short'});
+      dateInput.value = state.currentDate;
       todaySummary.innerHTML='';
-      const date=todayISO();
+      const date=state.currentDate;
       const values=getEntry(date);
 
       state.fields.forEach(f=>{
         const row=document.createElement('div'); row.className='item';
         const val = values[f.id];
-        let ctrl='';
+        let ctrl;
         if(f.type==='number'){
-          ctrl = `<input class="input" type="number" step="any" value="${val??''}" style="width:120px" data-id="${f.id}"> ${progressBadge(val, f.goal)}`;
+          ctrl = document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.step='any'; ctrl.style.width='120px'; ctrl.value = (val??'');
+          ctrl.oninput = () => setEntryValue(date, f.id, ctrl.value===''?null:Number(ctrl.value));
         } else if(f.type==='boolean'){
-          ctrl = `<label style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" ${val? 'checked':''} data-id="${f.id}"> Avkrysset</label>`;
+          ctrl = segToggle(!!val, v => setEntryValue(date, f.id, v));
         } else {
-          ctrl = `<textarea class="input" rows="2" placeholder="f.eks. 3 ting jeg er takknemlig for…" data-id="${f.id}" style="min-width:260px">${val??''}</textarea>`;
+          ctrl = document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='f.eks. 3 ting jeg er takknemlig for…'; ctrl.style.minWidth='240px'; ctrl.value = val??'';
+          let t; const commit=()=>{ clearTimeout(t); t=setTimeout(()=>setEntryValue(date,f.id,ctrl.value),200); }; ctrl.oninput=commit; ctrl.onchange=commit;
         }
-        row.innerHTML = `<div class="grow"><div><strong>${f.name}</strong> <span class="muted small">• ${f.type}</span></div></div><div>${ctrl}</div>`;
+        row.appendChild(Object.assign(document.createElement('div'),{className:'grow', innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}</span>`}));
+        const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap);
         todaySummary.appendChild(row);
       });
-
-      // inputs -> autosave (debounce)
-      let t; const commit=()=>{ clearTimeout(t); t=setTimeout(async ()=>{
-        const date=todayISO(); const next={...getEntry(date)};
-        todaySummary.querySelectorAll('[data-id]').forEach(el=>{
-          const id=el.getAttribute('data-id');
-          if(el.type==='checkbox') next[id]=el.checked;
-          else if(el.type==='number') next[id]=el.value===''?null:Number(el.value);
-          else next[id]=el.value;
-        });
-        await pushEntry(date, next);
-        renderChart(); renderHistory14();
-      }, 250); };
-      todaySummary.querySelectorAll('input,textarea').forEach(el=>{ el.oninput=commit; el.onchange=commit; });
     }
 
+    /* 14-dagers kompakt */
     function renderHistory14(){
-      history14.innerHTML='';
-      const dates = lastNDates(14).reverse();
+      // streak på tvers av tall-felt i fremdrift: score >= mål? partial farger
+      const dates=lastNDates(14).reverse();
+      streakEl.innerHTML='';
       dates.forEach(d=>{
         const vals=getEntry(d);
-        const title = new Date(d).toLocaleDateString('no-NO',{weekday:'short', day:'2-digit', month:'short'});
+        let score=0, max=0;
+        state.fields.filter(f=>f.type==='number' && typeof f.goal==='number' && f.includeInProgress).forEach(f=>{
+          max++; const v=Number(vals[f.id]||0); if(v>=f.goal) score++;
+        });
+        const dot=document.createElement('div'); dot.className='dot';
+        if(max===0){ /* nøytral */ }
+        else if(score===0){ dot.classList.add('bad'); }
+        else if(score<max){ dot.classList.add('mid'); }
+        else { dot.classList.add('ok'); }
+        dot.title=new Date(d).toLocaleDateString('no-NO')+` – mål oppnådd ${score}/${max}`;
+        streakEl.appendChild(dot);
+      });
+
+      // mini-kort per tallfelt: gj.snitt 14d og mål
+      miniCards.innerHTML='';
+      state.fields.filter(f=>f.type==='number').forEach(f=>{
+        const vals=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
+        const avg=vals.length? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+        const hit=(typeof f.goal==='number' && avg!==null) ? Math.round((avg/f.goal)*100) : null;
+        const card=document.createElement('div'); card.className='item'; card.innerHTML=`<div class="grow"><b>${f.name}</b><div class="muted small">14d snitt${typeof f.goal==='number'?` vs mål ${f.goal}`:''}</div></div><div class="kpi">${avg!==null?avg.toFixed(1):'–'}${hit!==null?` <span class="small muted">(${hit}%)</span>`:''}</div>`;
+        miniCards.appendChild(card);
+      });
+
+      // kort liste (kun registrerte)
+      history14.innerHTML='';
+      dates.forEach(d=>{
+        const vals=getEntry(d);
+        const filled = Object.entries(vals).filter(([id,v])=>v!==null && v!=='' && v!==undefined);
+        if(!filled.length) return;
         const wrap=document.createElement('div'); wrap.className='item';
-        const numberBits = state.fields.filter(f=>f.type==='number').map(f=>{
-          const v=vals[f.id]; if(typeof v==='undefined' || v===null) return '';
-          const pct = (typeof f.goal==='number' && f.goal>0) ? Math.round((Number(v)/f.goal)*100) : null;
-          const cls = pct!==null && pct>=100 ? 'ok' : '';
-          return `<span class="pill ${cls}"><b>${f.name}</b> ${v}${typeof f.goal==='number'?` / ${f.goal}${pct!==null?` (${pct}%)`:''}`:''}</span>`;
-        }).filter(Boolean).join(' ');
-
-        const gratitudeBits = state.fields.filter(f=>f.type==='text').map(f=>{
-          const v=vals[f.id]; if(!v) return ''; return `<div class="small muted"><b>${f.name}:</b> ${String(v).slice(0,160)}</div>`;
-        }).filter(Boolean).join('');
-
-        wrap.innerHTML = `
-          <div class="date">${title}</div>
-          <div class="grow">${numberBits || '<span class="muted small">Ingen tall registrert</span>'}${gratitudeBits?'<div style="margin-top:4px">'+gratitudeBits+'</div>':''}</div>
-          <button class="btn small" data-open="${d}">Åpne</button>
-        `;
-        wrap.querySelector('[data-open]').onclick=()=>{
-          window.scrollTo({top:0, behavior:'smooth'});
-          // Kopier verdier fra dagen til dagens inputs for enkel redigering (why: rask redigering)
-          const today=todayISO(); const from=getEntry(d); const base={...getEntry(today)};
-          state.fields.forEach(f=>{ if(from[f.id]!==undefined){ base[f.id]=from[f.id]; }});
-          pushEntry(today, base).then(()=>{ renderToday(); renderChart(); });
-        };
+        const title=new Date(d).toLocaleDateString('no-NO',{weekday:'short', day:'2-digit', month:'short'});
+        const parts=filled.map(([id,v])=>{
+          const f=state.fields.find(x=>x.id===id); if(!f) return '';
+          if(f.type==='text') return `<div class="small muted"><b>${f.name}:</b> ${String(v).slice(0,100)}</div>`;
+          if(f.type==='boolean') return `<span class="small"><b>${f.name}:</b> ${v?'På':'Av'}</span>`;
+          return `<span class="small"><b>${f.name}:</b> ${v}${typeof f.goal==='number'?` / ${f.goal}`:''}</span>`;
+        }).join(' • ');
+        wrap.innerHTML=`<div class="grow"><b>${title}</b><div class="muted small">${parts}</div></div><button class="btn small" data-open="${d}">Åpne</button>`;
+        wrap.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
         history14.appendChild(wrap);
       });
     }
 
-    // ==== UI-binding ====
+    /* Kalender-popover */
+    let calMonth = new Date();
+    const calPanel=document.getElementById('calPanel'), calGrid=document.getElementById('calGrid'), calTitle=document.getElementById('calTitle');
+    function renderCalendar(){
+      const y=calMonth.getFullYear(), m=calMonth.getMonth();
+      calTitle.textContent = calMonth.toLocaleDateString('no-NO',{month:'long', year:'numeric'});
+      const first=new Date(Date.UTC(y,m,1)), start=((first.getUTCDay()+6)%7); // mandag-start
+      const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+      const prevDays=new Date(Date.UTC(y,m,0)).getUTCDate();
+      calGrid.innerHTML='';
+      // header
+      ['ma','ti','on','to','fr','lø','sø'].forEach(d=>{ const h=document.createElement('div'); h.className='hd'; h.textContent=d; calGrid.appendChild(h); });
+      // cells
+      const total=42; // 6 uker
+      for(let i=0;i<total;i++){
+        const cell=document.createElement('button');
+        let day, dateStr, muted=false;
+        if(i<start){ day=prevDays-start+i+1; const dt=new Date(Date.UTC(y,m-1,day)); dateStr=dt.toISOString().slice(0,10); muted=true; }
+        else if(i>=start+daysInMonth){ day=i-(start+daysInMonth)+1; const dt=new Date(Date.UTC(y,m+1,day)); dateStr=dt.toISOString().slice(0,10); muted=true; }
+        else { day=i-start+1; const dt=new Date(Date.UTC(y,m,day)); dateStr=dt.toISOString().slice(0,10); }
+        cell.textContent=String(day); if(muted) cell.classList.add('muted-day');
+        if(dateStr===state.currentDate) cell.classList.add('sel');
+        cell.onclick=()=>{ state.currentDate=dateStr; dateInput.value=state.currentDate; calPanel.style.display='none'; renderToday(); renderHistory14(); renderChart(); };
+        calGrid.appendChild(cell);
+      }
+    }
+
+    /* UI-binding */
     function bindUI(){
-      document.getElementById('btnExport').onclick=exportJSON;
+      document.getElementById('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url); };
       document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
-      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(f) importJSON(f);};
-      [periodEl,groupingEl,aggEl,smoothEl].forEach(el=>el.onchange=renderChart);
-      axisEl.onchange=(e)=>{state.axisMapMode=e.target.value; renderChart();};
-      showGoalsEl.onchange=renderChart;
-      document.getElementById('btnLogin').onclick=signIn;
-      document.getElementById('btnLogout').onclick=signOut;
+      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ const data=JSON.parse(t); const byId=new Map(state.fields.map(f=>[f.id,f])); (data.fields||[]).forEach(f=>byId.set(f.id,{...f,updatedAt:Date.now()})); state.fields=[...byId.values()]; for(const f of state.fields) pushField(f); for(const [d,vals] of Object.entries(data.entries||{})) pushEntry(d, vals); renderAll(); });};
+
+      document.getElementById('btnLogin').onclick=signIn; document.getElementById('btnLogout').onclick=signOut;
 
       const upd=()=>{netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted');};
       window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
 
-      // Felt-handling
-      document.getElementById('btnAddField').onclick=async ()=>{
-        await upsertField({name:f_name.value, type:f_type.value, goal:f_goal.value, includeInProgress:f_include.checked});
-        f_name.value=''; f_goal.value=''; f_include.checked=false;
-      };
+      document.getElementById('btnAddField').onclick=async ()=>{ await upsertField({name:f_name.value, type:f_type.value, goal:f_goal.value, includeInProgress:f_include.checked}); f_name.value=''; f_goal.value=''; f_include.checked=false; };
       document.getElementById('btnPresets').onclick=async ()=>{
         const presets=[
           {name:'Søvn (timer)', type:'number', goal:8, includeInProgress:true, axisHint:'right'},
           {name:'Søvnscore %', type:'number', goal:80, includeInProgress:true, axisHint:'left'},
           {name:'Trening (min)', type:'number', goal:30, includeInProgress:true, axisHint:'right'},
           {name:'Takknemlighet', type:'text'},
-          {name:'Meditasjon (min)', type:'number', goal:10, includeInProgress:true, axisHint:'right'},
           {name:'Alkoholfri dag', type:'boolean', includeInProgress:true}
-        ];
-        for(const p of presets) await upsertField(p);
+        ]; for(const p of presets) await upsertField(p);
       };
-      document.getElementById('btnDeleteAll').onclick=async ()=>{
-        if(!confirm('Slette alle felt og data lokalt + i sky? Dette kan ikke angres.')) return;
-        // Tøm lokalt
-        const fields = [...state.fields];
-        for(const f of fields) await deleteField(f.id);
-        // Tøm entries
-        for(const d of Object.keys(state.entries)){ await pushEntry(d, {}); delete state.entries[d]; }
-        renderAll();
-      };
+      document.getElementById('btnDeleteAll').onclick=async ()=>{ if(!confirm('Slette alle felt og data?')) return; const fs=[...state.fields]; for(const f of fs) await deleteField(f.id); for(const d of Object.keys(state.entries)){ await pushEntry(d, {}); delete state.entries[d]; } renderAll(); };
+
+      periodEl.onchange=renderChart; axisEl.onchange=e=>{ state.axisMapMode=e.target.value; renderChart(); }; showGoalsEl.onchange=renderChart;
+
+      dateInput.onchange=()=>{ state.currentDate=dateInput.value; renderToday(); renderHistory14(); renderChart(); }
+
+      // kalender-popover
+      document.getElementById('btnCal').onclick=()=>{ calPanel.style.display = calPanel.style.display==='none' ? 'block' : 'none'; renderCalendar(); };
+      document.getElementById('calPrev').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(), calMonth.getUTCMonth()-1, 1)); renderCalendar(); };
+      document.getElementById('calNext').onclick=()=>{ calMonth=new Date(Date.UTC(calMonth.getUTCFullYear(), calMonth.getUTCMonth()+1, 1)); renderCalendar(); };
+      document.addEventListener('click', (e)=>{ if(!document.getElementById('btnCal').contains(e.target) && !calPanel.contains(e.target)) calPanel.style.display='none'; });
     }
 
-    function renderAll(){
-      renderFieldList();
-      renderToday();
-      renderChart();
-      renderHistory14();
-    }
+    function renderAll(){ renderFieldList(); renderToday(); renderChart(); renderHistory14(); }
 
-    // ==== Boot ====
+    /* Boot */
     async function boot(){
       await idbOpen();
-      const fieldsArr=await idbGetAll('fields'); const byId=new Map(fieldsArr.map(f=>[f.id,f])); state.fields=[...byId.values()];
+      const fieldsArr=await idbGetAll('fields'); state.fields=[...new Map(fieldsArr.map(f=>[f.id,f])).values()];
       const entriesArr=await idbGetAll('entries'); state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
-      await tryInitFirebase();
-      bindUI();
+      await tryInitFirebase(); bindUI();
 
       if(fb.enabled){
         fb.auth.onAuthStateChanged(async (user)=>{
-          if(user){
-            state.uid=user.uid;
-            syncStatus.textContent='Pålogget';
-            document.getElementById('btnLogout').style.display='inline-block';
-            document.getElementById('btnLogin').style.display='none';
-            await startSync(user.uid);
-          } else {
-            state.uid=null;
-            syncStatus.textContent='Ikke pålogget';
-            document.getElementById('btnLogout').style.display='none';
-            document.getElementById('btnLogin').style.display='inline-block';
-            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries();
-          }
+          if(user){ state.uid=user.uid; syncStatus.textContent='Pålogget'; document.getElementById('btnLogout').style.display='inline-block'; document.getElementById('btnLogin').style.display='none'; await startSync(user.uid); }
+          else { state.uid=null; syncStatus.textContent='Ikke pålogget'; document.getElementById('btnLogout').style.display='none'; document.getElementById('btnLogin').style.display='inline-block'; if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); }
         });
-      } else {
-        syncStatus.textContent='Kun lokal lagring (legg inn Firebase-nøkler)';
-      }
+      } else { syncStatus.textContent='Kun lokal lagring'; }
 
-      renderAll();
+      state.currentDate = todayISO(); renderAll();
     }
 
     async function ensureDemo(){
@@ -635,6 +594,7 @@
       await upsertField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true, axisHint:'left'});
       await upsertField({id:'workout_min',name:'Trening (min)',type:'number',goal:30,includeInProgress:true, axisHint:'right'});
       await upsertField({id:'gratitude',name:'Takknemlighet',type:'text'});
+      await upsertField({id:'no_alcohol',name:'Alkoholfri dag',type:'boolean',includeInProgress:true});
       const base=todayISO();
       for(let i=0;i<21;i++){
         const d=iso(addDays(base,-i));
@@ -642,24 +602,14 @@
           sleep_score:Math.round(80+(Math.random()*20-10)),
           sleep_hours:Math.max(4,Math.min(10,Math.round(7+(Math.random()*4-2)))),
           workout_min:Math.max(0,Math.round(20+(Math.random()*20-10))),
-          gratitude: (Math.random()>0.6)? "familie • frisk luft • god kaffe" : ""
+          gratitude: (Math.random()>0.6)? "familie • frisk luft • god kaffe" : "",
+          no_alcohol: Math.random()>0.3
         });
       }
       renderAll();
     }
 
-    window.addEventListener('load', () => { boot().then(ensureDemo); });
-
-    /* Firestore Rules (referanse)
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{db}/documents {
-        match /users/{uid}/{col}/{doc} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
-        }
-      }
-    }
-    */
+    window.addEventListener('load', ()=>{ boot().then(ensureDemo); });
   </script>
 </body>
 </html>
