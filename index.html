@@ -271,56 +271,7 @@
     /* ===== State ===== */
     let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[], currentDate:todayISO(), historyExpanded:false };
 
-    /* ===== Firebase init (robust + fallback) ===== */
-    let fb={enabled:false, app:null, auth:null, db:null};
-    async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
-
-    async function setBestPersistence(auth){
-      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); return 'LOCAL'; }catch{}
-      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); return 'SESSION'; }catch{}
-      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE); return 'NONE';
-    }
-    function envLikelyBlocksPopupOrCookies(){
-      const ua=navigator.userAgent.toLowerCase();
-      const isIOS=/iphone|ipad|ipod/.test(ua);
-      const isSafari=/^((?!chrome|android).)*safari/.test(ua);
-      const isBrave=(navigator.brave && typeof navigator.brave.isBrave==='function');
-      const storageOk=(()=>{try{localStorage.setItem('__t','1');localStorage.removeItem('__t');return true;}catch{return false;}})();
-      return isIOS||isSafari||isBrave||!storageOk;
-    }
-
-    async function tryInitFirebase(){
-      if(!FIREBASE_CONFIG?.apiKey) return;
-      await waitForFirebase();
-      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth=firebase.auth();
-      fb.db=firebase.firestore();
-      fb.enabled=true;
-
-      fb.auth.useDeviceLanguage();
-      const mode=await setBestPersistence(fb.auth);
-      try{ await fb.auth.getRedirectResult(); }catch(e){ console.warn('redirect result:', e?.code, e?.message); }
-      try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
-
-      const el=document.getElementById('syncStatus'); if(el) el.title=`Auth persistence: ${mode}`;
-    }
-    async function signIn(){
-      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-      const provider=new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({prompt:'select_account'});
-      if(envLikelyBlocksPopupOrCookies()) return fb.auth.signInWithRedirect(provider);
-      try{ await fb.auth.signInWithPopup(provider); }
-      catch(e){
-        const code=e?.code||'';
-        if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')||code.includes('third-party-cookie')||code.includes('unauthorized-domain')||code.includes('blocked-by-extension')){
-          return fb.auth.signInWithRedirect(provider);
-        }
-        alert(`Kunne ikke logge inn: ${code}`); console.error('signIn error:', code, e?.message);
-      }
-    }
-    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){} }
-
-    /* ===== Tombstones (entry + field) ===== */
+    /* ===== Slettemarkører (entry + field) ===== */
     const isEmptyVal=(v,type)=>{
       if(type==='boolean') return v===null || typeof v==='undefined';
       if(type==='number')  return v===null || v==='' || typeof v==='undefined' || Number.isNaN(v);
@@ -349,7 +300,6 @@
       await idbDelete('fields', fieldId);
       await idbSet('tombstones', {id:`field:${fieldId}`, type:'field', fieldId, deletedAt:Date.now()});
       state.fields=state.fields.filter(f=>f.id!==fieldId);
-      // Fjern verdi for feltet i alle dager lokalt + push oppdatert dag
       for(const [d,vals] of Object.entries(state.entries)){ if(fieldId in vals){ delete vals[fieldId]; await pushEntry(d, vals); } }
       if(fb.enabled && state.uid){
         const u=fb.db.collection('users').doc(state.uid);
@@ -358,9 +308,53 @@
       }
     }
 
-    /* ===== Sync: to-veis merge + tombstones (fields+entries) ===== */
-    let unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
+    /* ===== Firebase init + 100% redirect auth ===== */
+    let fb={enabled:false, app:null, auth:null, db:null};
+    let authBusy=false, unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
 
+    async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
+    async function setBestPersistence(auth){
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);   return 'LOCAL'; }catch{}
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); return 'SESSION'; }catch{}
+      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);         return 'NONE';
+    }
+    async function tryInitFirebase(){
+      if(!FIREBASE_CONFIG?.apiKey) return;
+      await waitForFirebase();
+      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
+      fb.auth=firebase.auth();
+      fb.db=firebase.firestore();
+      fb.enabled=true;
+
+      fb.auth.useDeviceLanguage();
+      const mode=await setBestPersistence(fb.auth);
+
+      try{
+        const res=await fb.auth.getRedirectResult();
+        if(res && res.user){ console.log('Redirect OK', res.user.uid); }
+      }catch(e){
+        const msg=(e && (e.code||e.message))?`${e.code} – ${e.message}`:String(e);
+        showAuthHint(`Innlogging feilet: ${msg}. Sjekk Authorized domains og cookies.`);
+      }
+      try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
+      const el=document.getElementById('syncStatus'); if(el) el.title=`Auth persistence: ${mode}`;
+    }
+    async function signIn(){
+      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
+      if(authBusy) return; authBusy=true;
+      const provider=new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({prompt:'select_account'});
+      try{ await fb.auth.signInWithRedirect(provider); }
+      finally{ setTimeout(()=>authBusy=false,1500); }
+    }
+    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){ console.warn('signOut',e?.code||e); } }
+    function showAuthHint(text){
+      let bar=document.getElementById('authHint');
+      if(!bar){ bar=document.createElement('div'); bar.id='authHint'; bar.style.cssText='position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;font:14px/1.4 system-ui'; document.body.appendChild(bar); }
+      bar.textContent=text;
+    }
+
+    /* ===== Sync: to-veis merge + tombstones (fields+entries) ===== */
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap, esSnap, tsSnap] = await Promise.all([
@@ -372,9 +366,7 @@
       const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data(); remoteFields.set(v.id,v);});
       const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data(); remoteEntries.set(v.date, v.values||{});});
       const remoteFieldTombs=new Set(), remoteEntryTombs=new Set();
-      tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{
-        const v=d.data(); if(v.type==='entry'&&v.date) remoteEntryTombs.add(v.date); if(v.type==='field'&&v.fieldId) remoteFieldTombs.add(v.fieldId);
-      });
+      tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) remoteEntryTombs.add(v.date); if(v.type==='field'&&v.fieldId) remoteFieldTombs.add(v.fieldId);});
 
       const localFields = state.fields.map(f=>({...f, updatedAt:f.updatedAt||Date.now()}));
       const localEntries = {...state.entries};
@@ -382,21 +374,18 @@
       const localEntryTombs = new Set(localTombsArr.filter(t=>t.type==='entry').map(t=>t.date));
       const localFieldTombs = new Set(localTombsArr.filter(t=>t.type==='field').map(t=>t.fieldId));
 
-      // fields: nyeste vinner, men tombstones fjerner
       const byId=new Map(remoteFields);
       for(const lf of localFields){
-        if(remoteFieldTombs.has(lf.id) || localFieldTombs.has(lf.id)) continue; // respekter sletting
+        if(remoteFieldTombs.has(lf.id) || localFieldTombs.has(lf.id)) continue;
         const rf=byId.get(lf.id);
         if(!rf || (lf.updatedAt||0) >= (rf.updatedAt||0)) byId.set(lf.id, {...rf, ...lf, updatedAt: lf.updatedAt||Date.now()});
       }
       for(const fid of new Set([...remoteFieldTombs, ...localFieldTombs])) byId.delete(fid);
       const mergedFields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
 
-      // entries: kombiner, men entry-tombstones fjerner
       const mergedEntries={}; remoteEntries.forEach((vals,date)=>{ mergedEntries[date]={...vals}; });
       for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}), ...vals}; }
 
-      // Fjern keys for field-tombstones
       const allFieldTombs=new Set([...remoteFieldTombs, ...localFieldTombs]);
       if(allFieldTombs.size){
         for(const [date,vals] of Object.entries(mergedEntries)){
@@ -404,25 +393,16 @@
           if(isEmptyEntry(vals)) delete mergedEntries[date];
         }
       }
-      // Fjern datoer for entry-tombstones
       const allEntryTombs=new Set([...remoteEntryTombs, ...localEntryTombs]);
       for(const date of allEntryTombs) delete mergedEntries[date];
 
-      // skriv til sky
       const batch=fb.db.batch();
       for(const f of mergedFields) batch.set(u.collection('fields').doc(f.id), {...f, updatedAt:f.updatedAt||Date.now()},{merge:true});
       for(const [date,values] of Object.entries(mergedEntries)) batch.set(u.collection('entries').doc(date), {date, values, updatedAt:Date.now()},{merge:true});
-      for(const fid of allFieldTombs){
-        batch.delete(u.collection('fields').doc(fid));
-        batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true});
-      }
-      for(const date of allEntryTombs){
-        batch.delete(u.collection('entries').doc(date));
-        batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true});
-      }
+      for(const fid of allFieldTombs){ batch.delete(u.collection('fields').doc(fid)); batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true}); }
+      for(const date of allEntryTombs){ batch.delete(u.collection('entries').doc(date)); batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true}); }
       await batch.commit();
 
-      // speil lokalt
       state.fields=mergedFields; state.entries=mergedEntries;
       for(const f of mergedFields) await idbSet('fields', f);
       for(const [date,values] of Object.entries(mergedEntries)) await idbSet('entries', {date, values, updatedAt:Date.now()});
@@ -463,7 +443,6 @@
             if(existed){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; }
             await idbDelete('fields', v.fieldId);
             await idbSet('tombstones', {id:`field:${v.fieldId}`, type:'field', fieldId:v.fieldId, deletedAt:v.deletedAt||Date.now()});
-            // fjern feltverdier fra alle dager
             for(const [date,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date,values:vals,updatedAt:Date.now()}); } }
           }
         });
@@ -477,13 +456,11 @@
       await idbSet('fields', val);
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('fields').doc(val.id).set(val,{merge:true});
-        // rydde ev. field-tombstone i sky
         await fb.db.collection('users').doc(state.uid).collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{});
         await idbDelete('tombstones', `field:${val.id}`);
       }
     }
     async function deleteField(fieldId){ await markFieldDeleted(fieldId); renderAll(); }
-
     async function pushEntry(date, values){
       if(isEmptyEntry(values)){ await markEntryDeleted(date); renderHistory14(); renderChart(); return; }
       const val={date, values, updatedAt: Date.now()};
@@ -590,7 +567,6 @@
       const i=state.fields.findIndex(x=>x.id===f.id); if(i>=0) state.fields[i]={...state.fields[i],...f}; else state.fields.push(f);
       await pushField(i>=0?state.fields[i]:f); renderAll();
     }
-
     function segToggle(val,onChange){
       const el=document.createElement('div'); el.className='seg';
       const off=document.createElement('button'); off.textContent='Av'; off.setAttribute('aria-pressed',String(!val));
@@ -599,7 +575,6 @@
       off.onclick=()=>set(false); on.onclick=()=>set(true);
       el.append(off,on); return el;
     }
-
     function renderFieldList(){
       fieldsList.innerHTML='';
       state.fields.forEach(f=>{
@@ -630,7 +605,6 @@
         fieldsList.appendChild(wrap);
       });
     }
-
     function renderCalendar(){
       const y=calMonth.getFullYear(), m=calMonth.getMonth();
       calTitle.textContent=calMonth.toLocaleDateString('no-NO',{month:'long',year:'numeric'});
@@ -649,7 +623,6 @@
         calGrid.appendChild(cell);
       }
     }
-
     function renderToday(){
       dateInput.value=state.currentDate;
       todaySummary.innerHTML='';
@@ -666,7 +639,6 @@
         const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap); todaySummary.appendChild(row);
       });
     }
-
     function renderHistory14(){
       const dates=lastNDates(14).reverse();
       streakEl.innerHTML=''; dates.forEach(d=>{
@@ -703,7 +675,7 @@
       btnToggleHistory.textContent=state.historyExpanded?'Skjul':'Utvid';
     }
 
-    /* ===== Bindings ===== */
+    /* ===== Bindings (UI + nett + import/eksport) ===== */
     function bindUI(){
       document.getElementById('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url); };
       document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
@@ -747,9 +719,14 @@
       await idbOpen();
       const fieldsArr=await idbGetAll('fields'); state.fields=[...new Map(fieldsArr.map(f=>[f.id,f])).values()];
       const entriesArr=await idbGetAll('entries'); state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
-      await tryInitFirebase();
-      bindUI();
+      bindUI();                      // UI først
+      state.currentDate=todayISO();  // sett dagens dato
+      renderAll();                   // tegn UI
+    }
 
+    /* ===== Auth bootstrap etter UI ===== */
+    async function bootAuthAndBindSync(){
+      await tryInitFirebase();
       if(fb.enabled){
         fb.auth.onAuthStateChanged(async (user)=>{
           if(user){
@@ -757,21 +734,18 @@
             syncStatus.textContent='Pålogget';
             document.getElementById('btnLogout').style.display='inline-block';
             document.getElementById('btnLogin').style.display='none';
-            await startSync(user.uid);
+            try{ await startSync(user.uid); }catch(e){ console.warn('startSync',e); showAuthHint('Synk feilet – sjekk nettverk/tilgang.'); }
           } else {
             state.uid=null;
             syncStatus.textContent='Ikke pålogget';
             document.getElementById('btnLogout').style.display='none';
             document.getElementById('btnLogin').style.display='inline-block';
-            if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
+            try{ if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs(); }catch{}
           }
         });
       } else {
         syncStatus.textContent='Kun lokal lagring';
       }
-
-      state.currentDate=todayISO();
-      renderAll();
     }
 
     async function ensureDemo(){
@@ -795,7 +769,11 @@
       renderAll();
     }
 
-    window.addEventListener('load',()=>{ boot().then(ensureDemo); });
+    window.addEventListener('load', async ()=>{
+      await boot();                  // UI + IDB
+      await bootAuthAndBindSync();   // Firebase auth (100% redirect) + synk
+      ensureDemo();                  // demo-data hvis tomt
+    });
 
     /* Firestore Rules (referanse)
     rules_version = '2';
