@@ -13,10 +13,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js" defer></script>
 
   <style>
-    :root{
-      --bg:#0b0d10;--card:#11151a;--surface:#0f131a;--text:#e7e7e7;--muted:#9aa4af;
-      --border:#1d232c;--accent:#5aa7ff;--radius:16px
-    }
+    :root{--bg:#0b0d10;--card:#11151a;--surface:#0f131a;--text:#e7e7e7;--muted:#9aa4af;--border:#1d232c;--accent:#5aa7ff;--radius:16px}
     *{box-sizing:border-box}
     body{margin:0;font:14px/1.5 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(11,13,16,.9);backdrop-filter:blur(8px)}
@@ -47,10 +44,10 @@
     <span id="syncStatus" class="small muted">Ikke pålogget</span><span class="muted">·</span>
     <span id="sdkChip" class="small muted">SDK: …</span>
     <div style="flex:1"></div>
-    <button id="btnImport" class="btn">Importer</button>
-    <button id="btnExport" class="btn ghost">Eksporter</button>
-    <button id="btnLogin" class="btn primary" onclick="window.__login && window.__login()">Logg inn</button>
-    <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
+    <button id="btnImport" class="btn" type="button">Importer</button>
+    <button id="btnExport" class="btn ghost" type="button">Eksporter</button>
+    <button id="btnLogin" class="btn primary" type="button" onclick="window.__login && window.__login()">Logg inn</button>
+    <button id="btnLogout" class="btn ghost" type="button" style="display:none">Logg ut</button>
   </header>
 
   <div class="container">
@@ -62,8 +59,8 @@
           <div class="row" style="justify-content:space-between">
             <label>Dato <input id="dateInput" class="input" type="date"/></label>
             <div class="row">
-              <button id="btnPrev" class="btn">◀︎</button>
-              <button id="btnNext" class="btn">▶︎</button>
+              <button id="btnPrev" class="btn" type="button">◀︎</button>
+              <button id="btnNext" class="btn" type="button">▶︎</button>
             </div>
           </div>
 
@@ -115,7 +112,7 @@
           </select>
           <input id="f_goal" class="input" type="number" step="any" inputmode="decimal" placeholder="Mål (valgfritt, tall)"/>
           <label class="small" style="display:flex;align-items:center;gap:8px"><input id="f_include" type="checkbox"/> I fremdrift</label>
-          <button id="btnAddField" class="btn">Legg til</button>
+          <button id="btnAddField" class="btn" type="button">Legg til</button>
         </div>
 
         <!-- Rask legg-til -->
@@ -135,7 +132,7 @@
       <section class="card span-12">
         <div class="row" style="justify-content:space-between">
           <h2 style="margin:0">Siste 14 dager</h2>
-          <button id="btnToggleHistory" class="btn">Utvid</button>
+          <button id="btnToggleHistory" class="btn" type="button">Utvid</button>
         </div>
         <div id="miniCards" class="list" style="margin-top:8px"></div>
         <div id="history14" class="list" style="margin-top:10px"></div>
@@ -146,17 +143,8 @@
   <input id="fileInput" type="file" accept="application/json" style="display:none"/>
 
   <script>
-    // ===== Firebase config =====
-    const FIREBASE_CONFIG={
-      apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
-      authDomain:"livstracker.firebaseapp.com",
-      projectId:"livstracker",
-      storageBucket:"livstracker.firebasestorage.app",
-      messagingSenderId:"885451038080",
-      appId:"1:885451038080:web:3df131af07a258a5bc7565"
-    };
-
-    // ===== Utils =====
+    /* ---------------- CORE CONFIG / UTILS ---------------- */
+    const FIREBASE_CONFIG={apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",authDomain:"livstracker.firebaseapp.com",projectId:"livstracker",storageBucket:"livstracker.firebasestorage.app",messagingSenderId:"885451038080",appId:"1:885451038080:web:3df131af07a258a5bc7565"};
     const $=id=>document.getElementById(id);
     const showBar=msg=>{const el=$("authHint");el.textContent=msg;el.style.display="block"};
     const hideBar=()=>$("authHint").style.display="none";
@@ -164,8 +152,9 @@
     const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
     const lastNDates=n=>{const out=[],b=new Date();for(let i=0;i<n;i++) out.push(iso(addDays(b,-i)));return out};
     const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
+    const safe = (fn)=>{try{fn()}catch(e){console.error(e);showBar((e&&e.message)||String(e))}}
 
-    // ===== IndexedDB =====
+    /* ---------------- INDEXED DB ---------------- */
     const DB_NAME='livstracker',DB_VERSION=3;let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
       rq.onupgradeneeded=()=>{const d=rq.result;
@@ -179,21 +168,20 @@
     const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).put(v);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
     const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
 
-    // ===== App-state =====
+    /* ---------------- STATE ---------------- */
     let state={fields:[],entries:{},uid:null,axisMapMode:'auto',currentDate:todayISO(),historyExpanded:false};
     const getEntry=d=>state.entries[d]||{};
     const isEmptyVal=(v,t)=>t==='boolean'?v==null:t==='number'?(v===''||v==null||Number.isNaN(v)):t==='text'?(v===''||v==null):v==null;
     const isEmptyEntry=v=>{if(!v)return true;for(const [fid,val] of Object.entries(v)){const f=state.fields.find(x=>x.id===fid);if(!f)continue;if(!isEmptyVal(val,f.type))return false}return true};
 
-    // ===== Firebase/Auth =====
+    /* ---------------- FIREBASE / AUTH (identisk stabil) ---------------- */
     let fb={enabled:false,app:null,auth:null,db:null},unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
     let firebaseReadyPromise=null;
-
     function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.defer=true;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
     async function ensureFirebaseReady(){
       if(fb.enabled) return;
       if(firebaseReadyPromise) return firebaseReadyPromise;
-      firebaseReadyPromise = (async ()=>{
+      firebaseReadyPromise=(async()=>{
         if(!window.firebase){
           await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js");
           await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js");
@@ -256,7 +244,7 @@
     window.__login=signIn;
     async function signOut(){ try{ await fb.auth.signOut(); }catch{} }
 
-    // ===== Synk (toveis + tombstones) =====
+    /* ---------------- SYNC (uendret logikk) ---------------- */
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -348,7 +336,7 @@
       });
     }
 
-    // ===== Graf =====
+    /* ---------------- UI / GRAF ---------------- */
     const chartCtx=document.getElementById('chart').getContext('2d'); let chart;
     function pickAxis(f){
       if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1';
@@ -365,24 +353,17 @@
       const ds=[]; nums.forEach((f,i)=>{const data=labels.map(d=>{const v=state.entries[d]?.[f.id]; return typeof v==='number'?v:null}); const axis=pickAxis(f); ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[i%colors.length],backgroundColor:'transparent',pointRadius:0,tension:.25}); if($('showGoals').checked&&typeof f.goal==='number') ds.push({label:f.name+' mål',data:labels.map(()=>f.goal),yAxisID:axis,borderColor:colors[i%colors.length],borderDash:[6,6],pointRadius:0,tension:0});});
       if(chart) chart.destroy();
       const cs=getComputedStyle(document.documentElement);
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{
-        responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},
-        scales:{
-          y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}},
-          y1:{position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
-          x:{grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}}
-        }
-      }});
+      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},scales:{y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}},y1:{position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},x:{grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}}}}});
       const legend=$('legend'); legend.innerHTML='';
       nums.forEach(f=>{
         const row=document.createElement('div'); row.className='item';
-        row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`;
+        row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small" type="button">Vis/Skjul</button>`;
         row.querySelector('button').onclick=()=>{const i=chart.data.datasets.findIndex(d=>d.label===f.name);const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');if(i>=0)chart.toggleDataVisibility(i);if(gi>=0)chart.toggleDataVisibility(gi);chart.update()};
         legend.appendChild(row);
       });
     }
 
-    // ===== Dagens oversikt (hjerter) =====
+    /* ---------------- PROGRESS (hjerter) ---------------- */
     function computeProgress(date){
       const vals=getEntry(date);
       const items=state.fields.filter(f=>f.includeInProgress);
@@ -393,30 +374,18 @@
         else if(f.type==='number' && typeof f.goal==='number') d=(typeof v==='number') && (v>=f.goal);
         else if(f.type==='text') d=(v!=null && String(v).trim().length>0);
         if(d) done++;
-        return {id:f.id,name:f.name,type:f.type,done:d,value:v,goal:f.goal};
+        return {id:f.id,done:d};
       });
       const pct=total?Math.round(done*100/total):0;
       return {done,total,pct,detail};
     }
-    function renderHearts(pct){
-      // 0–3 hjerter
-      const filled = Math.max(0, Math.min(3, Math.round(pct/33)));
-      return '❤️'.repeat(filled) + '🤍'.repeat(3-filled);
-    }
-    function renderProgress(){
-      const {done,total,pct}=computeProgress(state.currentDate);
-      $('progressText').textContent = `${done}/${total} (${pct}%)`;
-      $('progressHearts').textContent = renderHearts(pct);
-    }
+    function renderHearts(pct){const filled=Math.max(0,Math.min(3,Math.round(pct/33)));return '❤️'.repeat(filled)+'🤍'.repeat(3-filled)}
+    function renderProgress(){const {done,total,pct}=computeProgress(state.currentDate);$('progressText').textContent=`${done}/${total} (${pct}%)`;$('progressHearts').textContent=renderHearts(pct);}
 
-    // ===== Registrering + 14d =====
+    /* ---------------- REGISTRERING + 14d ---------------- */
     const dateInput=$('dateInput'), btnPrev=$('btnPrev'), btnNext=$('btnNext'), todaySummary=$('todaySummary'), miniCards=$('miniCards'), history14=$('history14');
     function segToggle(val,onChange){const el=document.createElement('div'); el.style.display='inline-flex'; el.style.gap='6px'; const off=document.createElement('button');const on=document.createElement('button');off.className='btn';on.className='btn';off.textContent='Av';on.textContent='På'; const set=v=>{on.style.background=v?'#5aa7ff':'';on.style.color=v?'#fff':'';off.style.background=v?'':'#5aa7ff33'; onChange(v)}; set(!!val); off.onclick=()=>set(false); on.onclick=()=>set(true); el.append(off,on); return el;}
-    function clampIfKnown(id, val){
-      if(id==='sleep_score'){ if(val==null) return val; return Math.max(0, Math.min(100, val)); }
-      if(id==='sleep_hours'){ if(val==null) return val; return Math.max(0, Math.min(12, val)); }
-      return val;
-    }
+    function clampIfKnown(id, val){ if(id==='sleep_score'){ if(val==null) return val; return Math.max(0,Math.min(100,val)); } if(id==='sleep_hours'){ if(val==null) return val; return Math.max(0,Math.min(12,val)); } return val; }
     function renderToday(){
       dateInput.value=state.currentDate; todaySummary.innerHTML='';
       const date=state.currentDate, values=getEntry(date);
@@ -425,12 +394,12 @@
         let ctrl; const val=values[f.id];
         if(f.type==='number'){
           ctrl=document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value=(val??'');
-          ctrl.oninput=()=>{ const num=ctrl.value===''?null:Number(ctrl.value); const c=clampIfKnown(f.id,num); pushEntry(date,{...getEntry(date),[f.id]:c}); renderProgress(); };
+          ctrl.oninput=()=>safe(()=>{ const num=ctrl.value===''?null:Number(ctrl.value); const c=clampIfKnown(f.id,num); pushEntry(date,{...getEntry(date),[f.id]:c}); renderProgress(); });
         }else if(f.type==='boolean'){
-          ctrl=segToggle(!!val, v=>{ pushEntry(date,{...getEntry(date),[f.id]:v}); renderProgress(); });
+          ctrl=segToggle(!!val, v=>safe(()=>{ pushEntry(date,{...getEntry(date),[f.id]:v}); renderProgress(); }));
         }else{
           ctrl=document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='skriv…'; ctrl.style.minWidth='220px'; ctrl.value=val??'';
-          let t; const commit=()=>{clearTimeout(t); t=setTimeout(()=>{ pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}); renderProgress(); },200)}; ctrl.oninput=commit; ctrl.onchange=commit;
+          let t; const commit=()=>safe(()=>{clearTimeout(t); t=setTimeout(()=>{ pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}); renderProgress(); },200)}); ctrl.oninput=commit; ctrl.onchange=commit;
         }
         row.appendChild(Object.assign(document.createElement('div'),{style:'flex:1',innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål ${f.goal}`:''}</span>`}));
         const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap); todaySummary.appendChild(row);
@@ -460,28 +429,21 @@
         if(!parts) return;
         const p=computeProgress(d);
         const row=document.createElement('div'); row.className='item';
-        row.innerHTML=`<div style="flex:1">
-            <b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b>
-            <div class="small muted">${parts}</div>
-          </div>
-          <div class="small" style="text-align:right">
-            <div>${p.done}/${p.total}</div>
-            <div class="hearts">${renderHearts(p.pct)}</div>
-            <button class="btn small" data-open="${d}" style="margin-top:6px">Åpne</button>
-          </div>`;
+        row.innerHTML=`<div style="flex:1"><b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b><div class="small muted">${parts}</div></div><div class="small" style="text-align:right"><div>${p.done}/${p.total}</div><div class="hearts">${renderHearts(p.pct)}</div><button class="btn small" type="button" data-open="${d}" style="margin-top:6px">Åpne</button></div>`;
         row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
         history14.appendChild(row);
       });
     }
 
-    // ===== Feltliste / quick-add =====
+    /* ---------------- FELT / QUICK-ADD ---------------- */
     function renderFieldList(){
-      const box=$('fieldsList'); box.innerHTML='';
+      const box=$('fieldsList'); if(!box) return;
+      box.innerHTML='';
       state.fields.forEach(f=>{
         const w=document.createElement('div'); w.className='item';
         w.innerHTML=`<div style="flex:1"><b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål: ${f.goal}`:''}${f.includeInProgress?` • i fremdrift`:''}</span></div>
-          <div class="row"><button class="btn small" data-del>Fjern</button></div>`;
-        w.querySelector('[data-del]').onclick=()=>markFieldDeleted(f.id);
+          <div class="row"><button class="btn small" type="button" data-del>Fjern</button></div>`;
+        w.querySelector('[data-del]').onclick=()=>safe(()=>markFieldDeleted(f.id));
         box.appendChild(w);
       });
     }
@@ -493,17 +455,20 @@
         read_min:{id:'read_min',name:'Lese (min)',type:'number',goal:20,includeInProgress:false,axisHint:'right'},
         gratitude:{id:'gratitude',name:'Takknemlighet',type:'text',includeInProgress:false}
       };
-      document.querySelectorAll('#quickAdd .chip').forEach(c=>{
-        c.onclick=async()=>{
+      const wrap=$('quickAdd'); if(!wrap) return;
+      wrap.querySelectorAll('.chip').forEach(c=>{
+        c.addEventListener('click',()=>safe(async()=>{
           const key=c.getAttribute('data-quick'); const t=map[key]; if(!t) return;
-          // unngå duplikat
-          if(state.fields.some(f=>f.id===t.id)){ alert('Finnes allerede'); return; }
-          await pushField({...t,updatedAt:Date.now()}); renderAll();
-        };
+          if(state.fields.some(f=>f.id===t.id)){ showBar('Finnes allerede'); setTimeout(hideBar,1500); return; }
+          console.info('quickAdd', key);
+          await pushField({...t,updatedAt:Date.now()});
+          renderAll();
+          showBar('Lagt til: '+t.name); setTimeout(hideBar,800);
+        }),{passive:true});
       });
     }
 
-    // ===== CRUD =====
+    /* ---------------- CRUD ---------------- */
     async function pushField(f){
       const val={...f,updatedAt:f.updatedAt||Date.now()};
       await idbSet('fields',val);
@@ -526,29 +491,51 @@
       }
     }
 
-    // ===== Binding + Render =====
-    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
+    /* ---------------- RENDER / BIND ---------------- */
+    function renderAll(){ safe(renderToday); safe(render14); safe(renderChart); safe(renderFieldList); }
     function bindUI(){
-      $('btnLogin').addEventListener('click',signIn);
-      $('btnLogout').onclick=signOut;
-      $('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download="livstracker-export.json";a.click();URL.revokeObjectURL(url)};
-      $('btnImport').onclick=()=>$('fileInput').click();
-      $('fileInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{const data=JSON.parse(t); state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();});};
-      $('btnAddField').onclick=async()=>{
-        const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked};
+      // Knapper
+      $('btnLogin')?.addEventListener('click',signIn);
+      $('btnLogout')?.addEventListener('click',signOut);
+      $('btnExport')?.addEventListener('click',()=>safe(()=>{
+        const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:"application/json"});
+        const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download="livstracker-export.json"; a.click(); URL.revokeObjectURL(url);
+      }));
+      $('btnImport')?.addEventListener('click',()=>$('fileInput').click());
+      $('fileInput')?.addEventListener('change',e=>safe(async()=>{
+        const f=e.target.files?.[0]; if(!f) return; const t=await f.text(); const data=JSON.parse(t);
+        state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();
+      }));
+
+      // Legg til felt
+      $('btnAddField')?.addEventListener('click',()=>safe(async()=>{
+        console.info('addField clicked');
+        const f={id:uid(),name:($('f_name').value||'').trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked};
         const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g);
-        await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll();
-      };
+        await pushField(f);
+        $('f_name').value=''; $('f_goal').value=''; $('f_include').checked=false;
+        renderAll(); showBar('Felt lagt til'); setTimeout(hideBar,700);
+      }));
+
+      // Quick add
       bindQuickAdd();
-      $('btnToggleHistory').onclick=()=>{state.historyExpanded=!state.historyExpanded; render14();};
-      $('period').onchange=renderChart; $('axisMap').onchange=e=>{state.axisMapMode=e.target.value; renderChart();}; $('showGoals').onchange=renderChart;
+
+      // Historikk / graf
+      $('btnToggleHistory')?.addEventListener('click',()=>{state.historyExpanded=!state.historyExpanded; render14();});
+      $('period')?.addEventListener('change',renderChart);
+      $('axisMap')?.addEventListener('change',e=>{state.axisMapMode=e.target.value; renderChart();});
+      $('showGoals')?.addEventListener('change',renderChart);
+
+      // Nett-status
       const upd=()=>{const on=navigator.onLine; $('net').textContent=on?'Online':'Offline'; $('net').className='small '+(on?'':'muted')}; upd(); addEventListener('online',upd); addEventListener('offline',upd);
-      $('dateInput').onchange=()=>{state.currentDate=$('dateInput').value; renderToday(); render14(); renderChart();};
-      $('btnPrev').onclick=()=>{state.currentDate=iso(addDays(state.currentDate,-1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
-      $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
+
+      // Dato
+      $('dateInput')?.addEventListener('change',()=>{state.currentDate=$('dateInput').value; renderToday(); render14(); renderChart();});
+      $('btnPrev')?.addEventListener('click',()=>{state.currentDate=iso(addDays(state.currentDate,-1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();});
+      $('btnNext')?.addEventListener('click',()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();});
     }
 
-    // ===== Boot =====
+    /* ---------------- BOOT ---------------- */
     window.addEventListener('load', async ()=>{
       await idbOpen();
       const fs=await idbGetAll('fields'); state.fields=[...new Map(fs.map(f=>[f.id,f])).values()];
@@ -566,7 +553,7 @@
       try{ await ensureFirebaseReady(); }catch(e){ showBar('Init-feil: '+(e?.message||e)); }
     });
 
-    /* Firestore Rules (referanse)
+    /* Firestore Rules:
     rules_version = '2';
     service cloud.firestore {
       match /databases/{db}/documents {
