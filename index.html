@@ -271,7 +271,7 @@
     /* ===== State ===== */
     let state={ fields:[], entries:{}, uid:null, axisMapMode:'auto', selectedFields:[], currentDate:todayISO(), historyExpanded:false };
 
-    /* ===== Slettemarkører (entry + field) ===== */
+    /* ===== Slettemarkører ===== */
     const isEmptyVal=(v,type)=>{
       if(type==='boolean') return v===null || typeof v==='undefined';
       if(type==='number')  return v===null || v==='' || typeof v==='undefined' || Number.isNaN(v);
@@ -286,6 +286,70 @@
       } return true;
     };
 
+    /* ===== Firebase init + robust auth ===== */
+    let fb={enabled:false, app:null, auth:null, db:null};
+    let authBusy=false, unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
+
+    async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
+    async function setBestPersistence(auth){
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);   return 'LOCAL'; }catch{}
+      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); return 'SESSION'; }catch{}
+      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);         return 'NONE';
+    }
+    async function tryInitFirebase(){
+      if(!FIREBASE_CONFIG?.apiKey) return;
+      await waitForFirebase();
+      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
+      fb.auth=firebase.auth();
+      fb.db=firebase.firestore();
+      fb.enabled=true;
+
+      fb.auth.useDeviceLanguage();
+      const mode=await setBestPersistence(fb.auth);
+
+      // Fullfør ev. redirect
+      try{
+        const res=await fb.auth.getRedirectResult();
+        if(res && res.user){ console.log('Redirect OK', res.user.uid); }
+      }catch(e){
+        const msg=(e && (e.code||e.message))?`${e.code} – ${e.message}`:String(e);
+        showAuthHint(`Innlogging feilet: ${msg}. Sjekk Authorized domains og cookies.`);
+      }
+
+      try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
+      const el=document.getElementById('syncStatus'); if(el) el.title=`Auth persistence: ${mode}`;
+    }
+
+    async function signIn(){
+      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
+      if(authBusy) return; authBusy=true;
+      const provider=new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({prompt:'select_account'});
+
+      try {
+        // Popup først (best UX)
+        await fb.auth.signInWithPopup(provider);
+      } catch (e) {
+        const code = e?.code || "";
+        // Fallback til redirect hvis popup ikke støttes/blokkeres
+        if (code.includes("popup") || code.includes("operation-not-supported") || code.includes("web-storage-unsupported")) {
+          await fb.auth.signInWithRedirect(provider);
+        } else {
+          showAuthHint(`Login-feil: ${code} ${e?.message||""}. Sjekk at domenet er lagt til i Firebase Authentication → Authorized domains.`);
+        }
+      } finally {
+        setTimeout(()=>authBusy=false,1500);
+      }
+    }
+
+    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){ console.warn('signOut',e?.code||e); } }
+    function showAuthHint(text){
+      let bar=document.getElementById('authHint');
+      if(!bar){ bar=document.createElement('div'); bar.id='authHint'; bar.style.cssText='position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;font:14px/1.4 system-ui'; document.body.appendChild(bar); }
+      bar.textContent=text;
+    }
+
+    /* ===== Sync: to-veis merge + tombstones ===== */
     async function markEntryDeleted(date){
       await idbDelete('entries', date);
       await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
@@ -308,53 +372,6 @@
       }
     }
 
-    /* ===== Firebase init + 100% redirect auth ===== */
-    let fb={enabled:false, app:null, auth:null, db:null};
-    let authBusy=false, unsubFields=null, unsubEntries=null, unsubTombs=null, firstSynced=false;
-
-    async function waitForFirebase(maxTries=200){ while(!window.firebase && maxTries--){ await sleep(25); } if(!window.firebase) throw new Error("Firebase SDK lastet ikke"); }
-    async function setBestPersistence(auth){
-      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);   return 'LOCAL'; }catch{}
-      try{ await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); return 'SESSION'; }catch{}
-      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);         return 'NONE';
-    }
-    async function tryInitFirebase(){
-      if(!FIREBASE_CONFIG?.apiKey) return;
-      await waitForFirebase();
-      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth=firebase.auth();
-      fb.db=firebase.firestore();
-      fb.enabled=true;
-
-      fb.auth.useDeviceLanguage();
-      const mode=await setBestPersistence(fb.auth);
-
-      try{
-        const res=await fb.auth.getRedirectResult();
-        if(res && res.user){ console.log('Redirect OK', res.user.uid); }
-      }catch(e){
-        const msg=(e && (e.code||e.message))?`${e.code} – ${e.message}`:String(e);
-        showAuthHint(`Innlogging feilet: ${msg}. Sjekk Authorized domains og cookies.`);
-      }
-      try{ await fb.db.enablePersistence({synchronizeTabs:true}); }catch(e){}
-      const el=document.getElementById('syncStatus'); if(el) el.title=`Auth persistence: ${mode}`;
-    }
-    async function signIn(){
-      if(!fb.enabled) return alert('Firebase ikke konfigurert.');
-      if(authBusy) return; authBusy=true;
-      const provider=new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({prompt:'select_account'});
-      try{ await fb.auth.signInWithRedirect(provider); }
-      finally{ setTimeout(()=>authBusy=false,1500); }
-    }
-    async function signOut(){ try{ if(fb.enabled) await fb.auth.signOut(); }catch(e){ console.warn('signOut',e?.code||e); } }
-    function showAuthHint(text){
-      let bar=document.getElementById('authHint');
-      if(!bar){ bar=document.createElement('div'); bar.id='authHint'; bar.style.cssText='position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;font:14px/1.4 system-ui'; document.body.appendChild(bar); }
-      bar.textContent=text;
-    }
-
-    /* ===== Sync: to-veis merge + tombstones (fields+entries) ===== */
     async function reconcileAndUpload(uid){
       const u=fb.db.collection('users').doc(uid);
       const [fsSnap, esSnap, tsSnap] = await Promise.all([
@@ -450,7 +467,7 @@
       });
     }
 
-    /* ===== CRUD (updatedAt + sletting når tom) ===== */
+    /* ===== CRUD ===== */
     async function pushField(f){
       const val={...f, updatedAt:f.updatedAt||Date.now()};
       await idbSet('fields', val);
@@ -675,7 +692,7 @@
       btnToggleHistory.textContent=state.historyExpanded?'Skjul':'Utvid';
     }
 
-    /* ===== Bindings (UI + nett + import/eksport) ===== */
+    /* ===== Bindings ===== */
     function bindUI(){
       document.getElementById('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='livstracker-export.json'; a.click(); URL.revokeObjectURL(url); };
       document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
@@ -771,7 +788,7 @@
 
     window.addEventListener('load', async ()=>{
       await boot();                  // UI + IDB
-      await bootAuthAndBindSync();   // Firebase auth (100% redirect) + synk
+      await bootAuthAndBindSync();   // Firebase auth (popup→redirect fallback) + synk
       ensureDemo();                  // demo-data hvis tomt
     });
 
