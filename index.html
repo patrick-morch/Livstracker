@@ -7,42 +7,59 @@
   <title>Livstracker</title>
 
   <style>
-    :root { --bg:#0b0d10; --card:#11151a; --text:#e7e7e7; --muted:#9aa4af; --line:#1d232c; --chip:#2a3342; --btn:#151922; --focus:#5aa7ff; }
+    :root{
+      --bg:#0b0d10; --card:#11151a; --text:#e7e7e7; --muted:#9aa4af; --accent:#5aa7ff;
+      --line:#1d232c; --line2:#263040; --chip:#0f131a;
+    }
     *{box-sizing:border-box}
     body{margin:0;font:14px/1.45 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    header{padding:14px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,16,.9);backdrop-filter:blur(8px);z-index:10}
+    header{
+      padding:14px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);
+      position:sticky;top:0;background:rgba(11,13,16,.92);backdrop-filter:blur(8px);z-index:5
+    }
     h1{font-size:16px;margin:0}
-    .muted{color:var(--muted)} .small{font-size:12px}
-    .btn{padding:8px 12px;border:1px solid #263040;background:var(--btn);color:var(--text);border-radius:10px;cursor:pointer}
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    .btn{padding:8px 12px;border:1px solid var(--line2);background:#151922;color:var(--text);border-radius:10px;cursor:pointer}
     .btn.ghost{background:transparent}
-    .btn:focus{outline:2px solid var(--focus);outline-offset:2px}
-    .select, .input{background:#0f131a;border:1px solid #263040;color:var(--text);padding:8px 10px;border-radius:10px}
+    .btn.primary{background:var(--accent);border-color:transparent;color:#07111f}
+    .select,.input{
+      background:var(--chip);border:1px solid var(--line2);color:var(--text);
+      padding:8px 10px;border-radius:10px
+    }
     main{padding:18px;display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
     .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .span-5{grid-column:span 5}
-    .span-7{grid-column:span 7}
-    .span-12{grid-column:span 12}
-    @media (max-width:980px){
-      main{grid-template-columns:repeat(6,1fr)}
-      .span-5,.span-7,.span-12{grid-column:span 6}
-      .grid2{grid-template-columns:1fr}
+    .grow{flex:1}
+    .grid2{display:grid;grid-template-columns:1fr 1.6fr;gap:14px}
+    @media (max-width:1100px){ .grid2{grid-template-columns:1fr} }
+
+    #banner{
+      display:none;
+      padding:10px 12px;
+      border-bottom:1px solid #3a2b0a;
+      background:#2b1f07;
+      color:#ffd08a;
+      font-size:13px
     }
-    .banner{display:none;padding:10px 12px;border-bottom:1px solid var(--line);background:#221a0b;color:#ffd9a1}
-    .banner.show{display:block}
-    .fieldRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px dashed #1f2630}
-    .fieldLeft{display:flex;flex-direction:column;gap:2px}
-    .fieldName{font-weight:600}
-    .pill{display:inline-flex;gap:8px;align-items:center}
-    .hearts{display:flex;gap:6px;align-items:center;font-size:18px}
-    .heartOff{opacity:.25}
-    .kpi{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid #1f2630;border-radius:14px;background:#0f131a}
-    .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--chip);cursor:pointer}
-    .chip.off{opacity:.45}
-    .divider{height:1px;background:#1f2630;margin:10px 0}
-    canvas{max-width:100%}
+
+    .sectionTitle{font-weight:600;margin:0 0 8px 0}
+    .fieldRow{
+      display:grid;grid-template-columns:1fr 180px;
+      gap:10px;align-items:center;
+      padding:10px 0;border-top:1px dashed #1b212a
+    }
+    .fieldRow:first-child{border-top:none;padding-top:0}
+    .meta{font-size:12px;color:var(--muted)}
+    .hearts{display:flex;gap:6px;align-items:center}
+    .heart{font-size:16px;opacity:.25}
+    .heart.on{opacity:1}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid #2a3342;background:transparent}
+    .list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .listItem{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:10px;border:1px solid #1b212a;border-radius:12px;background:#0f1318
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
@@ -52,106 +69,95 @@
 </head>
 
 <body>
-  <div id="banner" class="banner"></div>
+  <div id="banner"></div>
 
   <header>
     <h1>Livstracker</h1>
     <span id="net" class="small muted"></span>
     <span class="muted">·</span>
     <span id="syncStatus" class="small muted">Ikke pålogget</span>
-    <div style="flex:1"></div>
+    <div class="grow"></div>
     <button id="btnImport" class="btn">Importer JSON</button>
     <button id="btnExport" class="btn ghost">Eksporter JSON</button>
-    <button id="btnLogin" class="btn">Logg inn</button>
+    <button id="btnLogin" class="btn primary">Logg inn</button>
     <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
   </header>
 
   <main>
-    <!-- Daglig input -->
-    <section class="card span-5">
-      <div class="row" style="justify-content:space-between">
-        <div class="pill">
-          <span class="muted">Dato</span>
-          <input id="datePick" class="input" type="date" />
+    <section class="card" style="grid-column:span 12">
+      <div class="grid2">
+
+        <!-- LEFT: Dag -->
+        <div class="card" style="padding:14px">
+          <div class="row" style="justify-content:space-between">
+            <div class="row">
+              <label class="small muted">Dato</label>
+              <input id="datePick" class="input" type="date" />
+              <button id="prevDay" class="btn ghost" title="Forrige dag">◀</button>
+              <button id="nextDay" class="btn ghost" title="Neste dag">▶</button>
+            </div>
+            <div class="hearts" id="hearts"></div>
+          </div>
+
+          <div style="margin-top:10px" class="card">
+            <div class="small muted">Dagens oversikt</div>
+            <div style="font-size:18px;font-weight:700;margin-top:4px" id="dayProgress">0/0 (0%)</div>
+          </div>
+
+          <div class="row" style="margin-top:10px;justify-content:space-between">
+            <button id="btnAddField" class="btn">+ Legg til felt</button>
+            <div class="small muted">Tall + checkbox</div>
+          </div>
+
+          <div id="fieldsToday" style="margin-top:10px"></div>
         </div>
-        <div class="pill">
-          <button id="prevDay" class="btn ghost" title="Forrige">◀</button>
-          <button id="nextDay" class="btn ghost" title="Neste">▶</button>
+
+        <!-- RIGHT: Graf -->
+        <div class="card" style="padding:14px">
+          <div class="row">
+            <label>Periode
+              <select id="period" class="select">
+                <option value="14">14 dager</option>
+                <option value="30">30 dager</option>
+                <option value="90">90 dager</option>
+                <option value="365">1 år</option>
+                <option value="all">Alt</option>
+              </select>
+            </label>
+            <label>Akse
+              <select id="axisMap" class="select">
+                <option value="auto">Auto</option>
+                <option value="manual">Manuell</option>
+              </select>
+            </label>
+            <label class="small" style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" id="showGoals" />
+              Mål-linjer
+            </label>
+            <div class="grow"></div>
+            <label>Felt
+              <select id="fieldSelect" class="select" multiple size="1" style="min-width:240px"></select>
+            </label>
+          </div>
+
+          <div style="margin-top:10px">
+            <canvas id="chart" height="120"></canvas>
+            <div class="small muted" style="margin-top:8px">
+              Kun tallfelt i grafen · Venstre 0–100 · Høyre 0–12
+            </div>
+          </div>
+
+          <div class="list" id="fieldList"></div>
         </div>
+
       </div>
-
-      <div style="height:10px"></div>
-
-      <div class="row" style="justify-content:space-between;align-items:flex-start">
-        <div class="kpi" style="flex:1">
-          <div class="muted small">Dagens oversikt</div>
-          <div id="progressText" style="font-size:18px;font-weight:700">0/0 (0%)</div>
-        </div>
-        <div class="hearts" id="hearts" style="padding:10px 12px">
-          <span class="heartOff">♥</span><span class="heartOff">♥</span><span class="heartOff">♥</span>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div id="dayFields"></div>
-
-      <div class="divider"></div>
-
-      <div class="row" style="justify-content:space-between">
-        <button id="btnAddField" class="btn ghost">+ Legg til felt</button>
-        <span class="small muted">Tall + checkbox</span>
-      </div>
-    </section>
-
-    <!-- Grafer -->
-    <section class="card span-7">
-      <div class="row" style="justify-content:space-between">
-        <div class="row">
-          <label class="pill">
-            <span class="muted">Periode</span>
-            <select id="period" class="select">
-              <option value="7">7 dager</option>
-              <option value="14" selected>14 dager</option>
-              <option value="30">30 dager</option>
-              <option value="365">År</option>
-              <option value="all">Alt</option>
-            </select>
-          </label>
-
-          <label class="pill">
-            <span class="muted">Akse</span>
-            <select id="axisMap" class="select">
-              <option value="auto" selected>Auto</option>
-              <option value="manual">Manuell</option>
-            </select>
-          </label>
-
-          <label class="pill small" style="gap:8px">
-            <input type="checkbox" id="showGoals" />
-            Mål-linjer
-          </label>
-        </div>
-
-        <label class="pill">
-          <span class="muted">Felt</span>
-          <select id="fieldSelect" class="select" multiple size="1" style="min-width:220px"></select>
-        </label>
-      </div>
-
-      <div style="height:10px"></div>
-
-      <canvas id="chart" height="130"></canvas>
-
-      <div id="legend" class="legend"></div>
-      <div class="small muted">Kun tall i grafen · Venstre 0–100 · Høyre 0–12</div>
     </section>
   </main>
 
   <input id="fileInput" type="file" accept="application/json" style="display:none" />
 
   <script>
-    // ===================== Firebase config (din) =====================
+    // ========= Firebase config (DIN) =========
     const FIREBASE_CONFIG = {
       apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
       authDomain: "livstracker.firebaseapp.com",
@@ -161,58 +167,81 @@
       appId: "1:885451038080:web:3df131af07a258a5bc7565"
     };
 
-    // ===================== Utils =====================
+    // ========= Utils =========
+    const banner = (msg) => {
+      const el = document.getElementById('banner');
+      if(!msg){ el.style.display='none'; el.textContent=''; return; }
+      el.textContent = msg;
+      el.style.display='block';
+    };
     const todayISO = () => new Date().toISOString().slice(0,10);
     const iso = d => new Date(d).toISOString().slice(0,10);
     const addDays = (d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; };
-    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
-    const byId = (arr)=>new Map(arr.map(x=>[x.id,x]));
-    const normId = (name)=>name.toLowerCase().trim()
-      .replace(/[^\p{L}\p{N}]+/gu,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('field_'+Math.random().toString(16).slice(2,8));
+    const slug = (s)=>String(s||'felt').toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40);
 
-    function showBanner(msg){
-      const el=document.getElementById('banner');
-      el.textContent=msg;
-      el.classList.add('show');
+    // ========= IndexedDB (FIX: aldri downgrade) =========
+    const DB_NAME='livstracker';
+    const DB_VERSION=4; // <-- viktig: høyere enn det du har hatt før
+    let db;
+
+    function deleteDB(){
+      return new Promise((res,rej)=>{
+        const rq=indexedDB.deleteDatabase(DB_NAME);
+        rq.onsuccess=()=>res();
+        rq.onerror=()=>rej(rq.error);
+        rq.onblocked=()=>rej(new Error("deleteDatabase blocked"));
+      });
     }
-    function clearBanner(){
-      const el=document.getElementById('banner');
-      el.textContent='';
-      el.classList.remove('show');
+
+    function idbOpen(){
+      return new Promise((res,rej)=>{
+        const rq=indexedDB.open(DB_NAME, DB_VERSION);
+
+        rq.onupgradeneeded=()=>{
+          const d=rq.result;
+          if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
+          if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
+          if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'k'});
+        };
+
+        rq.onsuccess=()=>{ db=rq.result; res(); };
+        rq.onerror=()=>rej(rq.error);
+      });
     }
 
-    // ===================== IndexedDB (local-first) =====================
-    const DB_NAME='livstracker', DB_VERSION=1; let db;
-    function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
-      rq.onupgradeneeded=()=>{const d=rq.result;
-        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
-        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
-      };
-      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
-    });}
-    const idbGetAll = (store)=>new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
-    const idbSet = (store,val)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
+    const idbGetAll = (store)=>new Promise((res,rej)=>{
+      const r=db.transaction(store,'readonly').objectStore(store).getAll();
+      r.onsuccess=()=>res(r.result||[]);
+      r.onerror=()=>rej(r.error);
+    });
 
-    // ===================== App-state =====================
-    let state={
-      fields:[],
-      entries:{},   // date -> values
-      uid:null,
-      selectedDate: todayISO(),
-      axisMapMode:'auto',
-      selectedFields:[]
+    const idbSet = (store,val)=>new Promise((res,rej)=>{
+      const tx=db.transaction(store,'readwrite');
+      tx.objectStore(store).put(val);
+      tx.oncomplete=()=>res();
+      tx.onerror=()=>rej(tx.error);
+    });
+
+    // ========= State =========
+    let state = {
+      fields: [],
+      entries: {},
+      uid: null,
+      axisMapMode: 'auto',
+      selectedFields: [],
+      selectedDate: todayISO()
     };
 
-    // ===================== Firebase init + auth =====================
+    // ========= Firebase init/auth =========
     let fb = { enabled:false, app:null, auth:null, db:null };
 
     function waitForFirebase(){
-      return new Promise((resolve,reject)=>{
-        const start=Date.now();
+      return new Promise((resolve, reject) => {
+        const start = Date.now();
         (function check(){
           if(window.firebase && firebase.auth && firebase.firestore) return resolve();
-          if(Date.now()-start>8000) return reject(new Error("Firebase SDK lastet ikke (timeout)"));
-          setTimeout(check,50);
+          if(Date.now() - start > 8000) return reject(new Error("Firebase SDK lastet ikke (timeout)"));
+          setTimeout(check, 50);
         })();
       });
     }
@@ -222,42 +251,53 @@
 
       await waitForFirebase();
 
-      if(!firebase.apps.length) fb.app=firebase.initializeApp(FIREBASE_CONFIG);
-      else fb.app=firebase.app();
+      if(!firebase.apps.length) fb.app = firebase.initializeApp(FIREBASE_CONFIG);
+      else fb.app = firebase.app();
 
-      fb.auth=firebase.auth();
-      fb.db=firebase.firestore();
-      fb.enabled=true;
+      fb.auth = firebase.auth();
+      fb.db   = firebase.firestore();
+      fb.enabled = true;
 
-      // Auth persistence (hjelper mot "kommer tilbake men ikke pålogget")
-      try { await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
+      // persistence (kan feile i noen miljøer, men da fortsetter vi)
+      try{ await fb.db.enablePersistence({ synchronizeTabs:true }); }catch(e){}
 
-      // Firestore offline cache (valgfritt)
-      try { await fb.db.enablePersistence({synchronizeTabs:true}); } catch(e){}
-
-      // Viktig for redirect-flow: hent resultatet (ignorer hvis ingen redirect)
-      try { await fb.auth.getRedirectResult(); } catch(e){
-        console.warn("RedirectResult:", e?.code, e?.message);
+      // fullfør redirect
+      try{
+        const res = await fb.auth.getRedirectResult();
+        const wanted = sessionStorage.getItem('lt_login_redirect') === '1';
+        if(wanted){
+          sessionStorage.removeItem('lt_login_redirect');
+          if(!res?.user && !fb.auth.currentUser){
+            banner("Login returnerte uten bruker. Sjekk Authorized domains + cookies.");
+          } else {
+            banner(null);
+          }
+        }
+      } catch(e){
+        console.warn("getRedirectResult:", e?.code, e?.message);
       }
     }
 
     async function signIn(){
-      clearBanner();
       try{
         if(!fb.enabled) return alert("Firebase ikke konfigurert.");
-        try { await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
-        const provider=new firebase.auth.GoogleAuthProvider();
+        banner(null);
+        sessionStorage.setItem('lt_login_redirect','1');
+        try{ await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
+        const provider = new firebase.auth.GoogleAuthProvider();
         await fb.auth.signInWithRedirect(provider);
-      }catch(e){
-        console.warn("Login:", e?.code, e?.message);
-        alert(`Login-feil: ${e?.code || ''}\n${e?.message || e}`);
+      } catch(e){
+        console.warn("signIn:", e?.code, e?.message);
+        alert(`Login-feil: ${e?.code || ''} ${e?.message || e}`);
       }
     }
+
     async function signOut(){
-      try{ if(fb.enabled && fb.auth.currentUser) await fb.auth.signOut(); }catch(e){}
+      try{ if(fb.enabled && fb.auth.currentUser) await fb.auth.signOut(); }
+      catch(e){ console.warn("signOut:", e); }
     }
 
-    // ===================== Sync: sky <-> lokal =====================
+    // ========= Firestore sync =========
     let unsubFields=null, unsubEntries=null, firstUploaded=false;
 
     async function collectionHasAny(uid){
@@ -270,36 +310,32 @@
       const batch=fb.db.batch();
       const uref=fb.db.collection('users').doc(uid);
 
-      state.fields.forEach(f=>batch.set(
-        uref.collection('fields').doc(f.id),
-        {...f,updatedAt:Date.now()},
-        {merge:true}
-      ));
+      state.fields.forEach(f=>{
+        batch.set(uref.collection('fields').doc(f.id), {...f, updatedAt: Date.now()},{merge:true});
+      });
 
-      Object.entries(state.entries).forEach(([date,values])=>batch.set(
-        uref.collection('entries').doc(date),
-        {date,values,updatedAt:Date.now()},
-        {merge:true}
-      ));
+      Object.entries(state.entries).forEach(([date,values])=>{
+        batch.set(uref.collection('entries').doc(date), {date, values, updatedAt: Date.now()},{merge:true});
+      });
 
       await batch.commit();
     }
 
     async function startSync(uid){
       if(!firstUploaded){
-        const hasAny=await collectionHasAny(uid);
+        const hasAny = await collectionHasAny(uid);
         if(!hasAny) await uploadAllLocal(uid);
-        firstUploaded=true;
+        firstUploaded = true;
       }
 
-      if(unsubFields)unsubFields();
-      if(unsubEntries)unsubEntries();
+      if(unsubFields) unsubFields();
+      if(unsubEntries) unsubEntries();
 
       unsubFields = fb.db.collection('users').doc(uid).collection('fields')
         .onSnapshot(async snap=>{
-          const m=new Map();
-          snap.forEach(d=>{ const v=d.data(); if(v?.id) m.set(v.id,v); });
-          state.fields=[...m.values()].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+          const byId=new Map();
+          snap.forEach(d=>{ const v=d.data(); if(v?.id) byId.set(v.id, v); });
+          state.fields=[...byId.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name)));
           for(const f of state.fields) await idbSet('fields', f);
           renderAll();
         });
@@ -311,8 +347,10 @@
             const v=d.data();
             if(v?.date) all[v.date]=v.values||{};
           });
-          state.entries=all;
-          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+          state.entries = all;
+          for(const [date,values] of Object.entries(all)){
+            await idbSet('entries',{date, values, updatedAt: Date.now()});
+          }
           renderAll();
         });
     }
@@ -321,168 +359,215 @@
       await idbSet('fields', f);
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id)
-          .set({...f,updatedAt:Date.now()},{merge:true});
+          .set({...f, updatedAt: Date.now()},{merge:true});
       }
     }
+
     async function pushEntry(date, values){
-      await idbSet('entries',{date,values,updatedAt:Date.now()});
+      await idbSet('entries', {date, values, updatedAt: Date.now()});
       if(fb.enabled && state.uid){
         await fb.db.collection('users').doc(state.uid).collection('entries').doc(date)
-          .set({date,values,updatedAt:Date.now()},{merge:true});
+          .set({date, values, updatedAt: Date.now()},{merge:true});
       }
     }
 
-    // ===================== Import / Export =====================
-    function exportJSON(){
-      const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url; a.download='livstracker-export.json'; a.click();
-      URL.revokeObjectURL(url);
-    }
-    async function importJSON(file){
-      const text=await file.text();
-      const data=JSON.parse(text);
+    // ========= UI refs =========
+    const syncStatusEl = document.getElementById('syncStatus');
+    const netEl = document.getElementById('net');
 
-      const m=byId(state.fields);
-      (data.fields||[]).forEach(f=>m.set(f.id,{...f,updatedAt:Date.now()}));
-      state.fields=[...m.values()];
+    const datePick = document.getElementById('datePick');
+    const prevDay = document.getElementById('prevDay');
+    const nextDay = document.getElementById('nextDay');
+    const fieldsTodayEl = document.getElementById('fieldsToday');
+    const dayProgressEl = document.getElementById('dayProgress');
+    const heartsEl = document.getElementById('hearts');
 
-      for(const f of state.fields) await pushField(f);
-      for(const [d,vals] of Object.entries(data.entries||{})) await pushEntry(d, vals);
+    const periodEl = document.getElementById('period');
+    const axisEl = document.getElementById('axisMap');
+    const showGoalsEl = document.getElementById('showGoals');
+    const fieldSelect = document.getElementById('fieldSelect');
+    const fieldList = document.getElementById('fieldList');
 
-      renderAll();
-      alert("Import fullført");
-    }
+    const chartCtx = document.getElementById('chart').getContext('2d');
+    let chart;
 
-    // ===================== Progress (hearts) =====================
-    function isDone(field, value){
-      if(field.type==='checkbox') return value===true;
-      if(field.type==='number'){
-        if(value===null || typeof value==='undefined' || value==='') return false;
-        const n=Number(value);
-        if(Number.isNaN(n)) return false;
-        if(typeof field.goal==='number') return n>=field.goal;
-        return true;
-      }
-      return false;
+    // ========= Render: hearts/progress =========
+    function computeProgress(date){
+      const entry = state.entries[date] || {};
+      const progressFields = state.fields.filter(f => f.type==='check' && f.includeInProgress !== false);
+      const total = progressFields.length;
+      const done = progressFields.filter(f => entry[f.id] === true).length;
+      const pct = total ? Math.round(done/total*100) : 0;
+      return {done,total,pct};
     }
 
-    function renderProgress(){
-      const fields=state.fields.filter(f=>f.includeInProgress!==false);
-      const values=state.entries[state.selectedDate]||{};
-      const total=fields.length;
-      const done=fields.filter(f=>isDone(f, values[f.id])).length;
-      const pct= total ? Math.round((done/total)*100) : 0;
-
-      document.getElementById('progressText').textContent = `${done}/${total} (${pct}%)`;
-
-      const heartsEl=document.getElementById('hearts');
-      const filled = total ? clamp(Math.round((done/total)*3),0,3) : 0;
-      heartsEl.innerHTML = '';
-      for(let i=0;i<3;i++){
+    function renderHearts(date){
+      const {pct} = computeProgress(date);
+      const levels = [34, 67, 100];
+      heartsEl.innerHTML='';
+      levels.forEach(t=>{
         const s=document.createElement('span');
+        s.className='heart' + (pct>=t ? ' on' : '');
         s.textContent='♥';
-        if(i>=filled) s.className='heartOff';
         heartsEl.appendChild(s);
+      });
+    }
+
+    function renderDayProgress(date){
+      const {done,total,pct} = computeProgress(date);
+      dayProgressEl.textContent = `${done}/${total} (${pct}%)`;
+      renderHearts(date);
+    }
+
+    // ========= Render: fields today =========
+    function renderFieldsToday(){
+      const date = state.selectedDate;
+      const entry = state.entries[date] || {};
+      fieldsTodayEl.innerHTML='';
+
+      if(!state.fields.length){
+        const empty=document.createElement('div');
+        empty.className='meta';
+        empty.textContent='Legg til felter (tall/checkbox) for å starte.';
+        fieldsTodayEl.appendChild(empty);
+        renderDayProgress(date);
+        return;
       }
-    }
-
-    // ===================== Day UI =====================
-    function getEntry(date){
-      return state.entries[date] || {};
-    }
-
-    async function setEntryValue(date, fieldId, value){
-      const cur={...getEntry(date)};
-      cur[fieldId]=value;
-      state.entries={...state.entries, [date]:cur};
-      await pushEntry(date, cur);
-      renderAll();
-    }
-
-    function renderDay(){
-      document.getElementById('datePick').value = state.selectedDate;
-      const container=document.getElementById('dayFields');
-      container.innerHTML='';
-
-      const values=getEntry(state.selectedDate);
 
       state.fields.forEach(f=>{
         const row=document.createElement('div');
         row.className='fieldRow';
 
         const left=document.createElement('div');
-        left.className='fieldLeft';
-        left.innerHTML = `
-          <div class="fieldName">${f.name}</div>
-          <div class="small muted">${f.type}${typeof f.goal==='number' ? ` · mål ${f.goal}`:''}</div>
-        `;
+        const title=document.createElement('div');
+        title.style.fontWeight='600';
+        title.textContent = f.name;
+
+        const meta=document.createElement('div');
+        meta.className='meta';
+        const goalTxt = (f.type==='number' && typeof f.goal==='number') ? ` · mål ${f.goal}` : '';
+        meta.textContent = `${f.type}${goalTxt}`;
+
+        left.appendChild(title);
+        left.appendChild(meta);
 
         const right=document.createElement('div');
+        right.style.display='flex';
+        right.style.justifyContent='flex-end';
 
-        if(f.type==='checkbox'){
+        if(f.type==='check'){
+          const cb=document.createElement('input');
+          cb.type='checkbox';
+          cb.checked = entry[f.id] === true;
+          cb.onchange = async ()=>{
+            const next = {...(state.entries[date]||{})};
+            next[f.id] = cb.checked;
+            state.entries[date]=next;
+            await pushEntry(date, next);
+            renderAll();
+          };
+          right.appendChild(cb);
+        } else {
           const inp=document.createElement('input');
-          inp.type='checkbox';
-          inp.checked = values[f.id]===true;
-          inp.onchange=()=>setEntryValue(state.selectedDate, f.id, inp.checked);
-          right.appendChild(inp);
-        }else{
-          const inp=document.createElement('input');
-          inp.type='number';
           inp.className='input';
-          inp.style.width='140px';
-          inp.value = (typeof values[f.id]==='number' || typeof values[f.id]==='string') ? values[f.id] : '';
-          inp.onchange=()=>{
+          inp.type='number';
+          inp.step='0.1';
+          inp.value = (typeof entry[f.id] === 'number' || typeof entry[f.id] === 'string') ? entry[f.id] : proveNumber(entry[f.id]);
+          if(inp.value === 'NaN') inp.value = '';
+          inp.onchange = async ()=>{
             const v = inp.value==='' ? null : Number(inp.value);
-            setEntryValue(state.selectedDate, f.id, v);
+            const next = {...(state.entries[date]||{})};
+            if(v===null || Number.isNaN(v)) delete next[f.id];
+            else next[f.id]=v;
+            state.entries[date]=next;
+            await pushEntry(date, next);
+            renderAll();
           };
           right.appendChild(inp);
         }
 
         row.appendChild(left);
         row.appendChild(right);
-        container.appendChild(row);
+        fieldsTodayEl.appendChild(row);
       });
 
-      renderProgress();
+      renderDayProgress(date);
     }
 
-    async function addFieldFlow(){
-      const name = prompt("Navn på felt (f.eks. Trening, Lesing, Vekt):");
-      if(!name) return;
+    function proveNumber(v){
+      const n = Number(v);
+      return Number.isFinite(n) ? n : '';
+    }
 
-      const type = (prompt("Type: skriv number eller checkbox", "checkbox")||"").trim().toLowerCase();
-      if(type!=='number' && type!=='checkbox') return alert("Ugyldig type. Bruk number eller checkbox.");
+    // ========= Render: field select + list =========
+    function renderFieldSelect(){
+      fieldSelect.innerHTML='';
+      const numeric = state.fields.filter(f=>f.type==='number');
 
-      let goal = null;
-      if(type==='number'){
-        const g = prompt("Mål (valgfritt). Tom = ingen mål:", "");
-        goal = (g===null || g.trim()==='') ? null : Number(g);
-        if(goal!==null && Number.isNaN(goal)) return alert("Mål må være et tall.");
+      numeric.forEach(f=>{
+        const opt=document.createElement('option');
+        opt.value=f.id;
+        opt.textContent=f.name;
+        fieldSelect.appendChild(opt);
+      });
+
+      // default: alle valgt hvis ingen valgt ennå
+      if(!state.selectedFields.length){
+        state.selectedFields = numeric.map(f=>f.id);
       }
 
-      const id = normId(name);
-      const exists = state.fields.some(f=>f.id===id);
-      const finalId = exists ? (id+'_'+Math.random().toString(16).slice(2,6)) : id;
+      [...fieldSelect.options].forEach(o=>{
+        o.selected = state.selectedFields.includes(o.value);
+      });
 
-      const field = {
-        id: finalId,
-        name,
-        type,
-        goal: (type==='number' && typeof goal==='number') ? goal : undefined,
-        includeInProgress: true,
-        axisHint: (type==='number' ? 'right' : undefined),
-        updatedAt: Date.now()
+      fieldSelect.onchange=()=>{
+        state.selectedFields=[...fieldSelect.selectedOptions].map(o=>o.value);
+        renderChart();
+        renderFieldList();
       };
-
-      await pushField(field);
-      state.fields=[...byId([...state.fields, field]).values()];
-      renderAll();
     }
 
-    // ===================== Chart =====================
-    let chart;
+    function renderFieldList(){
+      fieldList.innerHTML='';
+      const numeric = state.fields.filter(f=>f.type==='number');
+      if(!numeric.length) return;
+
+      numeric.forEach(f=>{
+        const li=document.createElement('div');
+        li.className='listItem';
+
+        const left=document.createElement('div');
+        left.innerHTML = `<div style="font-weight:600">${escapeHtml(f.name)}</div><div class="meta">${(typeof f.goal==='number') ? 'mål '+f.goal : 'ingen mål'}</div>`;
+
+        const btn=document.createElement('button');
+        btn.className='btn ghost';
+        const on = state.selectedFields.includes(f.id);
+        btn.textContent = on ? 'Vis/Skjul' : 'Vis/Skjul';
+        btn.onclick=()=>{
+          const set=new Set(state.selectedFields);
+          if(set.has(f.id)) set.delete(f.id); else set.add(f.id);
+          state.selectedFields=[...set];
+          renderFieldSelect();
+          renderChart();
+          renderFieldList();
+        };
+
+        li.appendChild(left);
+        li.appendChild(btn);
+        fieldList.appendChild(li);
+      });
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+
+    // ========= Chart =========
+    function dateRangeFromPeriod(period){
+      if(period==='all') return null;
+      const days = Number(period);
+      return addDays(new Date(), -days+1);
+    }
 
     function pickAxis(field){
       if(state.axisMapMode==='manual' && field.axisHint){
@@ -495,20 +580,17 @@
       return 'y1';
     }
 
-    function periodSince(){
-      const p=periodEl.value;
-      if(p==='all') return null;
-      return addDays(new Date(), -Number(p));
-    }
-
-    function buildDatasets(labels, fields, matrix, showGoals){
+    function buildSeries(labels, selectedNumeric, showGoals){
       const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
-      const ds=[];
-      fields.forEach((f,idx)=>{
-        const axis=pickAxis(f);
-        const data=labels.map(d=> (matrix[d] && matrix[d][f.id]!==undefined) ? Number(matrix[d][f.id]) : null);
+      const datasets=[];
+      selectedNumeric.forEach((f,idx)=>{
+        const axis = pickAxis(f);
+        const data = labels.map(d=>{
+          const v = state.entries[d]?.[f.id];
+          return (typeof v === 'number') ? v : null;
+        });
 
-        ds.push({
+        datasets.push({
           label:f.name,
           data,
           yAxisID:axis,
@@ -519,9 +601,9 @@
         });
 
         if(showGoals && typeof f.goal==='number'){
-          ds.push({
+          datasets.push({
             label:f.name+' mål',
-            data:labels.map(()=>f.goal),
+            data: labels.map(()=>f.goal),
             yAxisID:axis,
             borderColor:colors[idx%colors.length],
             borderDash:[6,6],
@@ -530,32 +612,26 @@
           });
         }
       });
-      return ds;
+      return datasets;
     }
 
     function renderChart(){
-      const since=periodSince();
-      const datesAll=Object.keys(state.entries).sort();
-      const dates=datesAll.filter(d=>!since || new Date(d)>=since);
+      const since = dateRangeFromPeriod(periodEl.value);
+      const allDates = Object.keys(state.entries).sort();
+      const labels = allDates.filter(d=>!since || new Date(d) >= since);
 
-      const labels=dates; // dag for dag
-      const matrix={};
-      for(const d of labels) matrix[d]=state.entries[d]||{};
-
-      const selected = state.selectedFields.length ? new Set(state.selectedFields) : new Set(state.fields.map(f=>f.id));
-      const fields = state.fields.filter(f=>selected.has(f.id) && f.type==='number');
-
-      const datasets=buildDatasets(labels, fields, matrix, showGoalsEl.checked);
+      const numericMap = new Map(state.fields.filter(f=>f.type==='number').map(f=>[f.id,f]));
+      const selectedNumeric = state.selectedFields.map(id=>numericMap.get(id)).filter(Boolean);
 
       if(chart) chart.destroy();
-      chart=new Chart(chartCtx,{
+      chart = new Chart(chartCtx, {
         type:'line',
-        data:{labels,datasets},
+        data:{ labels, datasets: buildSeries(labels, selectedNumeric, showGoalsEl.checked) },
         options:{
           responsive:true,
           animation:false,
-          interaction:{mode:'nearest',intersect:false},
-          plugins:{legend:{display:true,position:'bottom'}},
+          interaction:{mode:'nearest', intersect:false},
+          plugins:{ legend:{display:true, position:'bottom'} },
           scales:{
             y:{type:'linear',position:'left',min:0,max:100,grid:{color:'#1e2633'},ticks:{color:'#9aa4af'}},
             y1:{type:'linear',position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
@@ -563,155 +639,193 @@
           }
         }
       });
-
-      legendEl.innerHTML='';
-      fields.forEach(f=>{
-        const chip=document.createElement('div');
-        chip.className='chip';
-        chip.textContent=f.name;
-        chip.onclick=()=>{
-          const i=chart.data.datasets.findIndex(d=>d.label===f.name);
-          const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');
-          if(i>=0) chart.toggleDataVisibility(i);
-          if(gi>=0) chart.toggleDataVisibility(gi);
-          chart.update();
-          chip.classList.toggle('off');
-        };
-        legendEl.appendChild(chip);
-      });
     }
 
-    // ===================== Field select =====================
-    function renderFieldSelect(){
-      fieldSelect.innerHTML='';
-      const nums = state.fields.filter(f=>f.type==='number');
-      nums.forEach(f=>{
-        const opt=document.createElement('option');
-        opt.value=f.id;
-        opt.textContent=f.name;
-        fieldSelect.appendChild(opt);
-      });
-      for(const id of state.selectedFields){
-        const o=[...fieldSelect.options].find(o=>o.value===id);
-        if(o) o.selected=true;
+    // ========= Import/Export =========
+    function exportJSON(){
+      const blob=new Blob([JSON.stringify({fields:state.fields, entries:state.entries},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='livstracker-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importJSON(file){
+      const text=await file.text();
+      const data=JSON.parse(text);
+
+      const byId=new Map(state.fields.map(f=>[f.id,f]));
+      (data.fields||[]).forEach(f=>byId.set(f.id,{...f, updatedAt:Date.now()}));
+      state.fields=[...byId.values()];
+
+      for(const f of state.fields) await pushField(f);
+
+      for(const [d,vals] of Object.entries(data.entries||{})){
+        state.entries[d]=vals||{};
+        await pushEntry(d, state.entries[d]);
       }
-      fieldSelect.onchange=()=>{
-        state.selectedFields=[...fieldSelect.selectedOptions].map(o=>o.value);
-        renderChart();
+
+      renderAll();
+      alert("Import fullført");
+    }
+
+    // ========= Add field =========
+    async function addFieldFlow(){
+      const name = prompt("Navn på felt (f.eks. Søvn timer, Trening, Lese):");
+      if(!name) return;
+
+      const typeRaw = prompt("Type: skriv 'number' for tall eller 'check' for checkbox:", "number");
+      const type = (String(typeRaw||'').toLowerCase().includes('check')) ? 'check' : 'number';
+
+      const id = `${slug(name)}_${Math.random().toString(16).slice(2,7)}`;
+
+      let goal = null;
+      let axisHint = null;
+      let includeInProgress = true;
+
+      if(type==='number'){
+        const g = prompt("Mål (valgfritt). Tom = ingen mål:", "");
+        goal = (g==='' || g===null) ? null : Number(g);
+        if(!Number.isFinite(goal)) goal=null;
+
+        const ax = prompt("Akse-hint: skriv 'left' (0–100) eller 'right' (0–12). Tom = auto:", "right");
+        axisHint = (ax==='left'||ax==='right') ? ax : null;
+
+        includeInProgress = false; // tall teller ikke i “checkbox progress”
+      } else {
+        includeInProgress = true;
+      }
+
+      const field = {
+        id, name,
+        type,
+        goal,
+        axisHint,
+        includeInProgress,
+        updatedAt: Date.now()
       };
-    }
 
-    function renderAll(){
-      renderFieldSelect();
-      renderDay();
-      renderChart();
-    }
+      state.fields.push(field);
+      await pushField(field);
 
-    // ===================== Defaults =====================
-    async function ensureDefaults(){
-      if(state.fields.length) return;
-
-      const defaults=[
-        {id:'sleep_hours', name:'Søvn (timer)', type:'number', goal:8, includeInProgress:true, axisHint:'right', updatedAt:Date.now()},
-        {id:'sleep_score', name:'Søvnscore %', type:'number', goal:80, includeInProgress:true, axisHint:'left', updatedAt:Date.now()},
-        {id:'training', name:'Trening', type:'checkbox', includeInProgress:true, updatedAt:Date.now()},
-        {id:'reading', name:'Lesing', type:'checkbox', includeInProgress:true, updatedAt:Date.now()}
-      ];
-      for(const f of defaults) await pushField(f);
-      state.fields = defaults;
-    }
-
-    // ===================== UI binding =====================
-    const syncStatus=document.getElementById('syncStatus');
-    const netEl=document.getElementById('net');
-    const periodEl=document.getElementById('period');
-    const axisEl=document.getElementById('axisMap');
-    const showGoalsEl=document.getElementById('showGoals');
-    const fieldSelect=document.getElementById('fieldSelect');
-    const chartCtx=document.getElementById('chart').getContext('2d');
-    const legendEl=document.getElementById('legend');
-
-    function bindUI(){
-      document.getElementById('btnExport').onclick=exportJSON;
-      document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
-      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(f) importJSON(f);};
-
-      document.getElementById('btnLogin').onclick=signIn;
-      document.getElementById('btnLogout').onclick=signOut;
-
-      document.getElementById('datePick').onchange=(e)=>{ state.selectedDate=e.target.value; renderAll(); };
-      document.getElementById('prevDay').onclick=()=>{ state.selectedDate=iso(addDays(state.selectedDate,-1)); renderAll(); };
-      document.getElementById('nextDay').onclick=()=>{ state.selectedDate=iso(addDays(state.selectedDate, 1)); renderAll(); };
-
-      document.getElementById('btnAddField').onclick=addFieldFlow;
-
-      periodEl.onchange=renderChart;
-      axisEl.onchange=(e)=>{ state.axisMapMode=e.target.value; renderChart(); };
-      showGoalsEl.onchange=renderChart;
-
-      const upd=()=>{ netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted'); };
-      window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
-    }
-
-    // ===================== Boot =====================
-    async function boot(){
-      await idbOpen();
-
-      // load local
-      const fieldsArr=await idbGetAll('fields');
-      state.fields=[...byId(fieldsArr).values()];
-
-      const entriesArr=await idbGetAll('entries');
-      state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
-
-      state.selectedDate = todayISO();
-
-      await tryInitFirebase();
-      bindUI();
-
-      if(fb.enabled){
-        fb.auth.onAuthStateChanged(async (user)=>{
-          if(user){
-            clearBanner();
-            state.uid=user.uid;
-            syncStatus.textContent='Pålogget';
-            document.getElementById('btnLogout').style.display='inline-block';
-            document.getElementById('btnLogin').style.display='none';
-            await startSync(user.uid);
-          }else{
-            state.uid=null;
-            syncStatus.textContent='Ikke pålogget';
-            document.getElementById('btnLogout').style.display='none';
-            document.getElementById('btnLogin').style.display='inline-block';
-
-            // Hvis du nettopp logget inn men får null her, er det nesten alltid cookies/domains
-            // (banner er nyttig men ikke spammer)
-          }
-        });
-      }else{
-        syncStatus.textContent='Kun lokal lagring';
+      // sørg for at tallfelt dukker i graf-valg
+      if(type==='number' && !state.selectedFields.includes(id)){
+        state.selectedFields.push(id);
       }
 
-      await ensureDefaults();
       renderAll();
     }
 
-    window.addEventListener('load', () => {
-      boot().catch(err=>{
-        console.error(err);
-        showBanner("Boot-feil: " + (err?.message || err));
-      });
-    });
+    // ========= Render all =========
+    function renderAll(){
+      datePick.value = state.selectedDate;
+      renderFieldsToday();
+      renderFieldSelect();
+      renderFieldList();
+      renderChart();
+    }
 
-    /* Firestore Rules (publiser disse):
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{db}/documents {
-        match /users/{uid}/{col}/{doc} {
-          allow read, write: if request.auth != null && request.auth.uid == uid;
+    // ========= Bind UI =========
+    function bindUI(){
+      document.getElementById('btnExport').onclick = exportJSON;
+      document.getElementById('btnImport').onclick = ()=>document.getElementById('fileInput').click();
+      document.getElementById('fileInput').onchange = (e)=>{ const f=e.target.files?.[0]; if(f) importJSON(f); };
+
+      document.getElementById('btnLogin').onclick = signIn;
+      document.getElementById('btnLogout').onclick = signOut;
+
+      document.getElementById('btnAddField').onclick = addFieldFlow;
+
+      periodEl.onchange = renderChart;
+      axisEl.onchange = (e)=>{ state.axisMapMode = e.target.value; renderChart(); };
+      showGoalsEl.onchange = renderChart;
+
+      datePick.onchange = ()=>{
+        state.selectedDate = datePick.value || todayISO();
+        renderFieldsToday();
+      };
+      prevDay.onclick = ()=>{ state.selectedDate = iso(addDays(state.selectedDate,-1)); renderFieldsToday(); };
+      nextDay.onclick = ()=>{ state.selectedDate = iso(addDays(state.selectedDate, 1)); renderFieldsToday(); };
+
+      const upd=()=>{
+        netEl.textContent = navigator.onLine ? 'Online' : 'Offline';
+      };
+      window.addEventListener('online', upd);
+      window.addEventListener('offline', upd);
+      upd();
+    }
+
+    // ========= Boot =========
+    async function boot(){
+      try{
+        await idbOpen();
+      } catch(e){
+        // Hvis du fortsatt har en “rare” DB i nettleser: auto-fix
+        if(e?.name === 'VersionError'){
+          banner("Lokal database var i feil versjon. Nullstiller lokal DB…");
+          await deleteDB();
+          await idbOpen();
+          banner(null);
+        } else {
+          banner(`Boot-feil: ${e?.message || e}`);
+          throw e;
         }
       }
+
+      // last lokal data
+      const fieldsArr = await idbGetAll('fields');
+      const byId=new Map(fieldsArr.map(f=>[f.id,f]));
+      state.fields=[...byId.values()];
+
+      const entriesArr = await idbGetAll('entries');
+      state.entries = Object.fromEntries(entriesArr.map(x=>[x.date, x.values||{}]));
+
+      // init
+      state.selectedDate = todayISO();
+      bindUI();
+      await tryInitFirebase();
+
+      // auth state
+      if(fb.enabled){
+        fb.auth.onAuthStateChanged(async (user)=>{
+          if(user){
+            state.uid=user.uid;
+            syncStatusEl.textContent='Pålogget';
+            document.getElementById('btnLogout').style.display='inline-block';
+            document.getElementById('btnLogin').style.display='none';
+            banner(null);
+            await startSync(user.uid);
+          } else {
+            state.uid=null;
+            syncStatusEl.textContent='Ikke pålogget';
+            document.getElementById('btnLogout').style.display='none';
+            document.getElementById('btnLogin').style.display='inline-block';
+            if(unsubFields)unsubFields();
+            if(unsubEntries)unsubEntries();
+          }
+        });
+      } else {
+        syncStatusEl.textContent='Kun lokal lagring';
+      }
+
+      renderAll();
     }
+
+    // ========= Start =========
+    window.addEventListener('load', ()=>boot());
+
+    /*
+      Firestore Rules (publiser disse i Firebase -> Firestore rules)
+
+      rules_version = '2';
+      service cloud.firestore {
+        match /databases/{db}/documents {
+          match /users/{uid}/{col}/{doc} {
+            allow read, write: if request.auth != null && request.auth.uid == uid;
+          }
+        }
+      }
     */
   </script>
 </body>
