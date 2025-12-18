@@ -2,565 +2,708 @@
 <!doctype html>
 <html lang="no">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Livstracker</title>
 
-  <!-- Libs -->
+  <style>
+    :root { --bg:#0b0d10; --card:#11151a; --text:#e7e7e7; --muted:#9aa4af; --line:#1d232c; --chip:#2a3342; --btn:#151922; --focus:#5aa7ff; }
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.45 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:14px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,16,.9);backdrop-filter:blur(8px);z-index:10}
+    h1{font-size:16px;margin:0}
+    .muted{color:var(--muted)} .small{font-size:12px}
+    .btn{padding:8px 12px;border:1px solid #263040;background:var(--btn);color:var(--text);border-radius:10px;cursor:pointer}
+    .btn.ghost{background:transparent}
+    .btn:focus{outline:2px solid var(--focus);outline-offset:2px}
+    .select, .input{background:#0f131a;border:1px solid #263040;color:var(--text);padding:8px 10px;border-radius:10px}
+    main{padding:18px;display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .span-5{grid-column:span 5}
+    .span-7{grid-column:span 7}
+    .span-12{grid-column:span 12}
+    @media (max-width:980px){
+      main{grid-template-columns:repeat(6,1fr)}
+      .span-5,.span-7,.span-12{grid-column:span 6}
+      .grid2{grid-template-columns:1fr}
+    }
+    .banner{display:none;padding:10px 12px;border-bottom:1px solid var(--line);background:#221a0b;color:#ffd9a1}
+    .banner.show{display:block}
+    .fieldRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px dashed #1f2630}
+    .fieldLeft{display:flex;flex-direction:column;gap:2px}
+    .fieldName{font-weight:600}
+    .pill{display:inline-flex;gap:8px;align-items:center}
+    .hearts{display:flex;gap:6px;align-items:center;font-size:18px}
+    .heartOff{opacity:.25}
+    .kpi{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid #1f2630;border-radius:14px;background:#0f131a}
+    .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--chip);cursor:pointer}
+    .chip.off{opacity:.45}
+    .divider{height:1px;background:#1f2630;margin:10px 0}
+    canvas{max-width:100%}
+  </style>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js" defer></script>
-
-  <style>
-    :root{--bg:#0b0d10;--card:#11151a;--surface:#0f131a;--text:#e7e7e7;--muted:#9aa4af;--border:#1d232c;--accent:#5aa7ff;--radius:16px}
-    *{box-sizing:border-box}
-    body{margin:0;font:14px/1.5 system-ui,Inter,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(11,13,16,.9);backdrop-filter:blur(8px)}
-    h1{font-size:16px;margin:0}.muted{color:var(--muted)}.small{font-size:12px}
-    .container{max-width:1200px;margin:0 auto;padding:0 16px}
-    main{padding:16px 0;display:grid;gap:16px;grid-template-columns:repeat(12,minmax(0,1fr))}
-    .span-12{grid-column:span 12}
-    @media (max-width:960px){main{grid-template-columns:repeat(6,1fr)}.span-12{grid-column:span 6}}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .list{display:grid;gap:8px}
-    .btn{padding:8px 12px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;cursor:pointer}
-    .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
-    .btn.ghost{background:transparent}
-    .input,.select,textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:10px}
-    .item{display:flex;gap:10px;align-items:center;border:1px dashed var(--border);border-radius:12px;padding:8px 10px;background:#0f131a}
-    .chip{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f131a;cursor:pointer}
-    #authHint{position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#fef3c7;color:#7c2d12;border-bottom:1px solid #f59e0b;display:none}
-    .hearts{font-size:18px;letter-spacing:2px}
-  </style>
 </head>
+
 <body>
-  <div id="authHint"></div>
+  <div id="banner" class="banner"></div>
 
   <header>
     <h1>Livstracker</h1>
-    <span id="net" class="small muted"></span><span class="muted">·</span>
-    <span id="syncStatus" class="small muted">Ikke pålogget</span><span class="muted">·</span>
-    <span id="sdkChip" class="small muted">SDK: …</span>
+    <span id="net" class="small muted"></span>
+    <span class="muted">·</span>
+    <span id="syncStatus" class="small muted">Ikke pålogget</span>
     <div style="flex:1"></div>
-    <button id="btnImport" class="btn">Importer</button>
-    <button id="btnExport" class="btn ghost">Eksporter</button>
-    <button id="btnLogin" class="btn primary" onclick="window.__login && window.__login()">Logg inn</button>
+    <button id="btnImport" class="btn">Importer JSON</button>
+    <button id="btnExport" class="btn ghost">Eksporter JSON</button>
+    <button id="btnLogin" class="btn">Logg inn</button>
     <button id="btnLogout" class="btn ghost" style="display:none">Logg ut</button>
   </header>
 
-  <div class="container">
-    <main>
-      <!-- Registrering + Graf -->
-      <section class="card span-12" style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px">
-        <!-- Registrering -->
-        <div>
-          <div class="row" style="justify-content:space-between">
-            <label>Dato <input id="dateInput" class="input" type="date"/></label>
-            <div class="row">
-              <button id="btnPrev" class="btn">◀︎</button>
-              <button id="btnNext" class="btn">▶︎</button>
-            </div>
-          </div>
+  <main>
+    <!-- Daglig input -->
+    <section class="card span-5">
+      <div class="row" style="justify-content:space-between">
+        <div class="pill">
+          <span class="muted">Dato</span>
+          <input id="datePick" class="input" type="date" />
+        </div>
+        <div class="pill">
+          <button id="prevDay" class="btn ghost" title="Forrige">◀</button>
+          <button id="nextDay" class="btn ghost" title="Neste">▶</button>
+        </div>
+      </div>
 
-          <!-- Dagens oversikt -->
-          <div id="progressBox" class="item" style="justify-content:space-between;margin:10px 0">
-            <div>
-              <div class="small muted">Dagens oversikt</div>
-              <div id="progressText" style="font-weight:600">0/0 (0%)</div>
-            </div>
-            <div id="progressHearts" class="hearts">🤍🤍🤍</div>
-          </div>
+      <div style="height:10px"></div>
 
-          <!-- Inputs for valgt dato -->
-          <div id="todaySummary" class="list"></div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div class="kpi" style="flex:1">
+          <div class="muted small">Dagens oversikt</div>
+          <div id="progressText" style="font-size:18px;font-weight:700">0/0 (0%)</div>
+        </div>
+        <div class="hearts" id="hearts" style="padding:10px 12px">
+          <span class="heartOff">♥</span><span class="heartOff">♥</span><span class="heartOff">♥</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="dayFields"></div>
+
+      <div class="divider"></div>
+
+      <div class="row" style="justify-content:space-between">
+        <button id="btnAddField" class="btn ghost">+ Legg til felt</button>
+        <span class="small muted">Tall + checkbox</span>
+      </div>
+    </section>
+
+    <!-- Grafer -->
+    <section class="card span-7">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <label class="pill">
+            <span class="muted">Periode</span>
+            <select id="period" class="select">
+              <option value="7">7 dager</option>
+              <option value="14" selected>14 dager</option>
+              <option value="30">30 dager</option>
+              <option value="365">År</option>
+              <option value="all">Alt</option>
+            </select>
+          </label>
+
+          <label class="pill">
+            <span class="muted">Akse</span>
+            <select id="axisMap" class="select">
+              <option value="auto" selected>Auto</option>
+              <option value="manual">Manuell</option>
+            </select>
+          </label>
+
+          <label class="pill small" style="gap:8px">
+            <input type="checkbox" id="showGoals" />
+            Mål-linjer
+          </label>
         </div>
 
-        <!-- Graf -->
-        <div>
-          <div class="row" style="justify-content:flex-end">
-            <label>Periode
-              <select id="period" class="select">
-                <option value="14d">14 dager</option><option value="30d">30 dager</option>
-                <option value="365d">1 år</option><option value="all">Alt</option>
-              </select>
-            </label>
-            <label>Akse
-              <select id="axisMap" class="select"><option value="auto">Auto</option><option value="manual">Manuell</option></select>
-            </label>
-            <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:20px">
-              <input type="checkbox" id="showGoals"/> Mål-linjer
-            </label>
-          </div>
-          <canvas id="chart" height="180"></canvas>
-          <div id="legend" class="list" style="margin-top:8px"></div>
-          <div class="small muted">Kun tallfelt i grafen • Venstre 0–100 • Høyre 0–12</div>
-        </div>
-      </section>
+        <label class="pill">
+          <span class="muted">Felt</span>
+          <select id="fieldSelect" class="select" multiple size="1" style="min-width:220px"></select>
+        </label>
+      </div>
 
-      <!-- Felt -->
-      <section class="card span-12">
-        <h2 style="margin:0 0 6px 0">Felt</h2>
+      <div style="height:10px"></div>
 
-        <div class="row" style="margin-bottom:8px">
-          <input id="f_name" class="input" placeholder="f.eks. Trening (min) / Takknemlighet" style="min-width:220px"/>
-          <select id="f_type" class="select">
-            <option value="number">Tall</option>
-            <option value="boolean">Av/på (checkbox)</option>
-            <option value="text">Tekst</option>
-          </select>
-          <input id="f_goal" class="input" type="number" step="any" inputmode="decimal" placeholder="Mål (valgfritt, tall)"/>
-          <label class="small" style="display:flex;align-items:center;gap:8px"><input id="f_include" type="checkbox"/> I fremdrift</label>
-          <button id="btnAddField" class="btn">Legg til</button>
-        </div>
+      <canvas id="chart" height="130"></canvas>
 
-        <!-- Rask legg-til -->
-        <div class="row" id="quickAdd" style="gap:8px;margin-bottom:8px">
-          <span class="small muted">Rask:</span>
-          <span class="chip" data-quick="sleep_score">Søvnscore %</span>
-          <span class="chip" data-quick="sleep_hours">Søvn (timer)</span>
-          <span class="chip" data-quick="workout_min">Trening (min)</span>
-          <span class="chip" data-quick="read_min">Lese (min)</span>
-          <span class="chip" data-quick="gratitude">Takknemlighet</span>
-        </div>
+      <div id="legend" class="legend"></div>
+      <div class="small muted">Kun tall i grafen · Venstre 0–100 · Høyre 0–12</div>
+    </section>
+  </main>
 
-        <div id="fieldsList" class="list"></div>
-      </section>
-
-      <!-- 14 dager -->
-      <section class="card span-12">
-        <div class="row" style="justify-content:space-between">
-          <h2 style="margin:0">Siste 14 dager</h2>
-          <button id="btnToggleHistory" class="btn">Utvid</button>
-        </div>
-        <div id="miniCards" class="list" style="margin-top:8px"></div>
-        <div id="history14" class="list" style="margin-top:10px"></div>
-      </section>
-    </main>
-  </div>
-
-  <input id="fileInput" type="file" accept="application/json" style="display:none"/>
+  <input id="fileInput" type="file" accept="application/json" style="display:none" />
 
   <script>
-    /* ==== CONFIG ==== */
-    const FIREBASE_CONFIG={apiKey:"AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",authDomain:"livstracker.firebaseapp.com",projectId:"livstracker",storageBucket:"livstracker.firebasestorage.app",messagingSenderId:"885451038080",appId:"1:885451038080:web:3df131af07a258a5bc7565"};
+    // ===================== Firebase config (din) =====================
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyA3xjP9w_q_uWx5ia7bJdfqs3_3RmZUVXg",
+      authDomain: "livstracker.firebaseapp.com",
+      projectId: "livstracker",
+      storageBucket: "livstracker.firebasestorage.app",
+      messagingSenderId: "885451038080",
+      appId: "1:885451038080:web:3df131af07a258a5bc7565"
+    };
 
-    /* ==== UTILS ==== */
-    const $=id=>document.getElementById(id);
-    const showBar=msg=>{const el=$("authHint");el.textContent=msg;el.style.display="block"};
-    const hideBar=()=>$("authHint").style.display="none";
-    const todayISO=()=>new Date().toISOString().slice(0,10), iso=d=>new Date(d).toISOString().slice(0,10);
-    const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
-    const lastNDates=n=>{const out=[],b=new Date();for(let i=0;i<n;i++) out.push(iso(addDays(b,-i)));return out};
-    const uid=()=>'id_'+Math.random().toString(36).slice(2,10);
+    // ===================== Utils =====================
+    const todayISO = () => new Date().toISOString().slice(0,10);
+    const iso = d => new Date(d).toISOString().slice(0,10);
+    const addDays = (d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+    const byId = (arr)=>new Map(arr.map(x=>[x.id,x]));
+    const normId = (name)=>name.toLowerCase().trim()
+      .replace(/[^\p{L}\p{N}]+/gu,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('field_'+Math.random().toString(16).slice(2,8));
 
-    /* ==== IndexedDB ==== */
-    const DB_NAME='livstracker',DB_VERSION=3;let db;
+    function showBanner(msg){
+      const el=document.getElementById('banner');
+      el.textContent=msg;
+      el.classList.add('show');
+    }
+    function clearBanner(){
+      const el=document.getElementById('banner');
+      el.textContent='';
+      el.classList.remove('show');
+    }
+
+    // ===================== IndexedDB (local-first) =====================
+    const DB_NAME='livstracker', DB_VERSION=1; let db;
     function idbOpen(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VERSION);
       rq.onupgradeneeded=()=>{const d=rq.result;
-        if(!d.objectStoreNames.contains('fields'))d.createObjectStore('fields',{keyPath:'id'});
-        if(!d.objectStoreNames.contains('entries'))d.createObjectStore('entries',{keyPath:'date'});
-        if(!d.objectStoreNames.contains('tombstones'))d.createObjectStore('tombstones',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('fields')) d.createObjectStore('fields',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('entries')) d.createObjectStore('entries',{keyPath:'date'});
       };
-      rq.onsuccess=()=>{db=rq.result;res()};rq.onerror=()=>rej(rq.error)
-    })}
-    const idbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
-    const idbSet=(s,v)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).put(v);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
-    const idbDelete=(s,k)=>new Promise((res,rej)=>{const tx=db.transaction(s,'readwrite');tx.objectStore(s).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
+      rq.onsuccess=()=>{db=rq.result;res();}; rq.onerror=()=>rej(rq.error);
+    });}
+    const idbGetAll = (store)=>new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error);});
+    const idbSet = (store,val)=>new Promise((res,rej)=>{const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);});
 
-    /* ==== State ==== */
-    let state={fields:[],entries:{},uid:null,axisMapMode:'auto',currentDate:todayISO(),historyExpanded:false};
-    const getEntry=d=>state.entries[d]||{};
-    const isEmptyVal=(v,t)=>t==='boolean'?v==null:t==='number'?(v===''||v==null||Number.isNaN(v)):t==='text'?(v===''||v==null):v==null;
-    const isEmptyEntry=v=>{if(!v)return true;for(const [fid,val] of Object.entries(v)){const f=state.fields.find(x=>x.id===fid);if(!f)continue;if(!isEmptyVal(val,f.type))return false}return true};
+    // ===================== App-state =====================
+    let state={
+      fields:[],
+      entries:{},   // date -> values
+      uid:null,
+      selectedDate: todayISO(),
+      axisMapMode:'auto',
+      selectedFields:[]
+    };
 
-    /* ==== Firebase/Auth ==== */
-    let fb={enabled:false,app:null,auth:null,db:null},unsubFields=null,unsubEntries=null,unsubTombs=null,firstSynced=false;
-    let firebaseReadyPromise=null;
+    // ===================== Firebase init + auth =====================
+    let fb = { enabled:false, app:null, auth:null, db:null };
 
-    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.defer=true;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
-    async function ensureFirebaseReady(){
-      if(fb.enabled) return;
-      if(firebaseReadyPromise) return firebaseReadyPromise;
-      firebaseReadyPromise=(async ()=>{
-        if(!window.firebase){
-          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js");
-          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js");
-          await loadScript("https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js");
-        }
-        await initFirebase();
-      })();
-      return firebaseReadyPromise;
-    }
-    async function setBestPersistence(auth){
-      try{await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);return'LOCAL'}catch{}
-      try{await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);return'SESSION'}catch{}
-      await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);return'NONE'
-    }
-    async function initFirebase(){
-      if(fb.enabled) return;
-      const sdkOk=!!window.firebase; $("sdkChip").textContent="SDK: "+(sdkOk?"ok":"mangler"); if(!sdkOk){showBar("Firebase SDK mangler."); return;}
-      fb.app=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
-      fb.auth=firebase.auth(); fb.db=firebase.firestore(); fb.enabled=true; fb.auth.useDeviceLanguage();
-      const p=await setBestPersistence(fb.auth); $("sdkChip").textContent+=" • "+p;
-      try{await fb.db.enablePersistence({synchronizeTabs:true})}catch{}
-
-      fb.auth.onAuthStateChanged(async user=>{
-        if(user){
-          hideBar(); state.uid=user.uid; $("syncStatus").textContent="Pålogget";
-          $("btnLogin").style.display="none"; $("btnLogout").style.display="inline-block";
-          if(!firstSynced){firstSynced=true; await startSync(user.uid).catch(e=>showBar("Synk-feil: "+(e?.message||e)))}
-        }else{
-          state.uid=null; $("syncStatus").textContent="Ikke pålogget";
-          $("btnLogout").style.display="none"; $("btnLogin").style.display="inline-block";
-          if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
-        }
+    function waitForFirebase(){
+      return new Promise((resolve,reject)=>{
+        const start=Date.now();
+        (function check(){
+          if(window.firebase && firebase.auth && firebase.firestore) return resolve();
+          if(Date.now()-start>8000) return reject(new Error("Firebase SDK lastet ikke (timeout)"));
+          setTimeout(check,50);
+        })();
       });
-
-      try{
-        if(sessionStorage.getItem('lt_redirect')==='1'){
-          const res=await fb.auth.getRedirectResult();
-          sessionStorage.removeItem('lt_redirect');
-          if(!res || !res.user){ showBar("Login returnerte uten bruker. Sjekk Authorized domains + cookies."); }
-        }else{
-          await fb.auth.getRedirectResult().catch(e=>{if((e?.code||'')!=='auth/no-auth-event')showBar(`Redirect-feil: ${e.code} ${e.message}`)});
-        }
-      }catch(e){ if((e?.code||'')!=='auth/no-auth-event') showBar(`Redirect-feil: ${e.code} ${e.message}`); }
     }
+
+    async function tryInitFirebase(){
+      if(!FIREBASE_CONFIG?.apiKey) return;
+
+      await waitForFirebase();
+
+      if(!firebase.apps.length) fb.app=firebase.initializeApp(FIREBASE_CONFIG);
+      else fb.app=firebase.app();
+
+      fb.auth=firebase.auth();
+      fb.db=firebase.firestore();
+      fb.enabled=true;
+
+      // Auth persistence (hjelper mot "kommer tilbake men ikke pålogget")
+      try { await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
+
+      // Firestore offline cache (valgfritt)
+      try { await fb.db.enablePersistence({synchronizeTabs:true}); } catch(e){}
+
+      // Viktig for redirect-flow: hent resultatet (ignorer hvis ingen redirect)
+      try { await fb.auth.getRedirectResult(); } catch(e){
+        console.warn("RedirectResult:", e?.code, e?.message);
+      }
+    }
+
     async function signIn(){
+      clearBanner();
       try{
-        await ensureFirebaseReady();
-        const provider=new firebase.auth.GoogleAuthProvider(); provider.setCustomParameters({prompt:'select_account'});
-        try{
-          await fb.auth.signInWithPopup(provider);
-        }catch(e){
-          const code=e?.code||''; if(code.includes('popup')||code.includes('operation-not-supported')||code.includes('web-storage-unsupported')){
-            sessionStorage.setItem('lt_redirect','1'); await fb.auth.signInWithRedirect(provider); return false;
-          }
-          showBar(`Login-feil: ${code} ${e?.message||''}`); alert(`Login-feil: ${code}\n${e?.message||''}`);
-        }
-      }catch(err){ showBar("Init-feil: "+(err?.message||err)); alert("Init-feil: "+(err?.message||err)); }
-      return false;
-    }
-    window.__login=signIn;
-    async function signOut(){ try{ await fb.auth.signOut(); }catch{} }
-
-    /* ==== Synk (toveis + tombstones) ==== */
-    async function markEntryDeleted(date){
-      await idbDelete('entries', date);
-      await idbSet('tombstones', {id:`entry:${date}`, type:'entry', date, deletedAt:Date.now()});
-      delete state.entries[date];
-      if(fb.enabled && state.uid){
-        const u=fb.db.collection('users').doc(state.uid);
-        await u.collection('entries').doc(date).delete().catch(()=>{});
-        await u.collection('tombstones').doc(`entry_${date}`).set({type:'entry',date,deletedAt:Date.now()},{merge:true});
+        if(!fb.enabled) return alert("Firebase ikke konfigurert.");
+        try { await fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
+        const provider=new firebase.auth.GoogleAuthProvider();
+        await fb.auth.signInWithRedirect(provider);
+      }catch(e){
+        console.warn("Login:", e?.code, e?.message);
+        alert(`Login-feil: ${e?.code || ''}\n${e?.message || e}`);
       }
     }
-    async function markFieldDeleted(fieldId){
-      await idbDelete('fields', fieldId);
-      await idbSet('tombstones', {id:`field:${fieldId}`, type:'field', fieldId, deletedAt:Date.now()});
-      state.fields=state.fields.filter(f=>f.id!==fieldId);
-      for(const [d,vals] of Object.entries(state.entries)){ if(fieldId in vals){ delete vals[fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } }
-      if(fb.enabled && state.uid){
-        const u=fb.db.collection('users').doc(state.uid);
-        await u.collection('fields').doc(fieldId).delete().catch(()=>{});
-        await u.collection('tombstones').doc(`field_${fieldId}`).set({type:'field',fieldId,deletedAt:Date.now()},{merge:true});
-      }
+    async function signOut(){
+      try{ if(fb.enabled && fb.auth.currentUser) await fb.auth.signOut(); }catch(e){}
     }
-    async function reconcileAndUpload(uid){
-      const u=fb.db.collection('users').doc(uid);
-      const [fsSnap,esSnap,tsSnap]=await Promise.all([
-        u.collection('fields').get(), u.collection('entries').get(),
-        u.collection('tombstones').get().catch(()=>({empty:true,forEach:()=>{}}))
-      ]);
-      const remoteFields=new Map(); fsSnap.forEach(d=>{const v=d.data();remoteFields.set(v.id,v)});
-      const remoteEntries=new Map(); esSnap.forEach(d=>{const v=d.data();remoteEntries.set(v.date,v.values||{})});
-      const rFieldT=new Set(), rEntryT=new Set(); tsSnap && !tsSnap.empty && tsSnap.forEach(d=>{const v=d.data(); if(v.type==='entry'&&v.date) rEntryT.add(v.date); if(v.type==='field'&&v.fieldId) rFieldT.add(v.fieldId); });
 
-      const localFields=state.fields.map(f=>({...f,updatedAt:f.updatedAt||Date.now()}));
-      const localEntries={...state.entries};
-      const localTombs=await idbGetAll('tombstones');
-      const lEntryT=new Set(localTombs.filter(t=>t.type==='entry').map(t=>t.date));
-      const lFieldT=new Set(localTombs.filter(t=>t.type==='field').map(t=>t.fieldId));
+    // ===================== Sync: sky <-> lokal =====================
+    let unsubFields=null, unsubEntries=null, firstUploaded=false;
 
-      const byId=new Map(remoteFields);
-      for(const lf of localFields){ if(rFieldT.has(lf.id)||lFieldT.has(lf.id)) continue;
-        const rf=byId.get(lf.id); if(!rf || (lf.updatedAt||0)>=(rf?.updatedAt||0)) byId.set(lf.id,{...rf,...lf,updatedAt:lf.updatedAt||Date.now()});
-      }
-      for(const fid of new Set([...rFieldT,...lFieldT])) byId.delete(fid);
-      const mergedFields=[...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
+    async function collectionHasAny(uid){
+      const f=await fb.db.collection('users').doc(uid).collection('fields').limit(1).get();
+      const e=await fb.db.collection('users').doc(uid).collection('entries').limit(1).get();
+      return !f.empty || !e.empty;
+    }
 
-      const mergedEntries={}; remoteEntries.forEach((vals,date)=>{mergedEntries[date]={...vals}});
-      for(const [date,vals] of Object.entries(localEntries)){ mergedEntries[date]={...(mergedEntries[date]||{}),...vals} }
-      const allFieldT=new Set([...rFieldT,...lFieldT]); if(allFieldT.size){
-        for(const [date,vals] of Object.entries(mergedEntries)){ for(const fid of allFieldT){ if(fid in vals) delete vals[fid]; } if(isEmptyEntry(vals)) delete mergedEntries[date]; }
-      }
-      const allEntryT=new Set([...rEntryT,...lEntryT]); for(const date of allEntryT) delete mergedEntries[date];
-
+    async function uploadAllLocal(uid){
       const batch=fb.db.batch();
-      for(const f of mergedFields) batch.set(u.collection('fields').doc(f.id), {...f,updatedAt:f.updatedAt||Date.now()},{merge:true});
-      for(const [date,values] of Object.entries(mergedEntries)) batch.set(u.collection('entries').doc(date), {date,values,updatedAt:Date.now()},{merge:true});
-      for(const fid of allFieldT){ batch.delete(u.collection('fields').doc(fid)); batch.set(u.collection('tombstones').doc(`field_${fid}`), {type:'field',fieldId:fid,deletedAt:Date.now()},{merge:true}); }
-      for(const date of allEntryT){ batch.delete(u.collection('entries').doc(date)); batch.set(u.collection('tombstones').doc(`entry_${date}`), {type:'entry',date,deletedAt:Date.now()},{merge:true}); }
+      const uref=fb.db.collection('users').doc(uid);
+
+      state.fields.forEach(f=>batch.set(
+        uref.collection('fields').doc(f.id),
+        {...f,updatedAt:Date.now()},
+        {merge:true}
+      ));
+
+      Object.entries(state.entries).forEach(([date,values])=>batch.set(
+        uref.collection('entries').doc(date),
+        {date,values,updatedAt:Date.now()},
+        {merge:true}
+      ));
+
       await batch.commit();
-
-      state.fields=mergedFields; state.entries=mergedEntries;
-      for(const f of mergedFields) await idbSet('fields',f);
-      for(const [d,vals] of Object.entries(mergedEntries)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()});
-      for(const fid of allFieldT) await idbSet('tombstones',{id:`field:${fid}`,type:'field',fieldId:fid,deletedAt:Date.now()});
-      for(const date of allEntryT) await idbSet('tombstones',{id:`entry:${date}`,type:'entry',date,deletedAt:Date.now()});
     }
+
     async function startSync(uid){
-      if(!firstSynced){ await reconcileAndUpload(uid); firstSynced=true; }
-      if(unsubFields)unsubFields(); if(unsubEntries)unsubEntries(); if(unsubTombs)unsubTombs();
-      const u=fb.db.collection('users').doc(uid);
-      unsubFields=u.collection('fields').onSnapshot(async snap=>{
-        const m=new Map(); snap.forEach(d=>{const v=d.data(); m.set(v.id,v)});
-        state.fields=[...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
-        for(const f of state.fields) await idbSet('fields',f);
-        renderAll();
-      });
-      unsubEntries=u.collection('entries').onSnapshot(async snap=>{
-        const all={}; snap.forEach(d=>{const v=d.data(); all[v.date]=v.values||{};});
-        state.entries=all;
-        for(const [d,vals] of Object.entries(all)) await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()});
-        renderAll();
-      });
-      unsubTombs=u.collection('tombstones').onSnapshot(async snap=>{
-        let changed=false;
-        snap.forEach(async d=>{
-          const v=d.data();
-          if(v.type==='entry'&&v.date){ if(state.entries[v.date]){ delete state.entries[v.date]; changed=true; } await idbDelete('entries',v.date); await idbSet('tombstones',{id:`entry:${v.date}`,...v}); }
-          if(v.type==='field'&&v.fieldId){
-            if(state.fields.some(f=>f.id===v.fieldId)){ state.fields=state.fields.filter(f=>f.id!==v.fieldId); changed=true; }
-            await idbDelete('fields',v.fieldId); await idbSet('tombstones',{id:`field:${v.fieldId}`,...v});
-            for(const [d,vals] of Object.entries(state.entries)){ if(v.fieldId in vals){ delete vals[v.fieldId]; await idbSet('entries',{date:d,values:vals,updatedAt:Date.now()}); } }
-          }
+      if(!firstUploaded){
+        const hasAny=await collectionHasAny(uid);
+        if(!hasAny) await uploadAllLocal(uid);
+        firstUploaded=true;
+      }
+
+      if(unsubFields)unsubFields();
+      if(unsubEntries)unsubEntries();
+
+      unsubFields = fb.db.collection('users').doc(uid).collection('fields')
+        .onSnapshot(async snap=>{
+          const m=new Map();
+          snap.forEach(d=>{ const v=d.data(); if(v?.id) m.set(v.id,v); });
+          state.fields=[...m.values()].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+          for(const f of state.fields) await idbSet('fields', f);
+          renderAll();
         });
-        if(changed) renderAll();
-      });
+
+      unsubEntries = fb.db.collection('users').doc(uid).collection('entries')
+        .onSnapshot(async snap=>{
+          const all={};
+          snap.forEach(d=>{
+            const v=d.data();
+            if(v?.date) all[v.date]=v.values||{};
+          });
+          state.entries=all;
+          for(const [date,values] of Object.entries(all)) await idbSet('entries',{date,values,updatedAt:Date.now()});
+          renderAll();
+        });
     }
 
-    /* ==== Graf ==== */
-    const chartCtx=document.getElementById('chart').getContext('2d'); let chart;
-    function pickAxis(f){
-      if(state.axisMapMode==='manual'&&f.axisHint) return f.axisHint==='left'?'y':'y1';
-      const n=(f.name||'').toLowerCase();
-      if(n.includes('score')||n.includes('%')) return 'y';
-      if(n.includes('timer')||n.includes('min')) return 'y1';
-      return (typeof f.goal==='number'&&f.goal>12)?'y':'y1';
-    }
-    function renderChart(){
-      const period=$('period').value, since=(period==='all'?null:addDays(new Date(),-({'14d':14,'30d':30,'365d':365}[period])));
-      const labels=Object.keys(state.entries).sort().filter(d=>!since||new Date(d)>=since);
-      const nums=state.fields.filter(f=>f.type==='number');
-      const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#22d3ee','#60a5fa','#93c5fd'];
-      const ds=[]; nums.forEach((f,i)=>{const data=labels.map(d=>{const v=state.entries[d]?.[f.id]; return typeof v==='number'?v:null}); const axis=pickAxis(f); ds.push({label:f.name,data,yAxisID:axis,borderColor:colors[i%colors.length],backgroundColor:'transparent',pointRadius:0,tension:.25}); if($('showGoals').checked&&typeof f.goal==='number') ds.push({label:f.name+' mål',data:labels.map(()=>f.goal),yAxisID:axis,borderColor:colors[i%colors.length],borderDash:[6,6],pointRadius:0,tension:0});});
-      if(chart) chart.destroy();
-      const cs=getComputedStyle(document.documentElement);
-      chart=new Chart(chartCtx,{type:'line',data:{labels,datasets:ds},options:{
-        responsive:true,animation:false,plugins:{legend:{display:true,position:'bottom'}},
-        scales:{
-          y:{position:'left',min:0,max:100,grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}},
-          y1:{position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
-          x:{grid:{color:cs.getPropertyValue('--border')},ticks:{color:'#9aa4af'}}
-        }
-      }});
-      const legend=$('legend'); legend.innerHTML='';
-      nums.forEach(f=>{
-        const row=document.createElement('div'); row.className='item';
-        row.innerHTML=`<div style="flex:1"><b>${f.name}</b>${typeof f.goal==='number'?` <span class="small muted">(mål ${f.goal})</span>`:''}</div><button class="btn small">Vis/Skjul</button>`;
-        row.querySelector('button').onclick=()=>{const i=chart.data.datasets.findIndex(d=>d.label===f.name);const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');if(i>=0)chart.toggleDataVisibility(i);if(gi>=0)chart.toggleDataVisibility(gi);chart.update()};
-        legend.appendChild(row);
-      });
-    }
-
-    /* ==== Dagens oversikt (hjerter) ==== */
-    function computeProgress(date){
-      const vals=getEntry(date);
-      const items=state.fields.filter(f=>f.includeInProgress);
-      let done=0, total=items.length;
-      const detail=items.map(f=>{
-        let d=false; const v=vals[f.id];
-        if(f.type==='boolean') d=!!v;
-        else if(f.type==='number' && typeof f.goal==='number') d=(typeof v==='number') && (v>=f.goal);
-        else if(f.type==='text') d=(v!=null && String(v).trim().length>0);
-        if(d) done++;
-        return {id:f.id,name:f.name,type:f.type,done:d,value:v,goal:f.goal};
-      });
-      const pct=total?Math.round(done*100/total):0;
-      return {done,total,pct,detail};
-    }
-    function renderHearts(pct){
-      const filled=Math.max(0,Math.min(3,Math.round(pct/33)));
-      return '❤️'.repeat(filled)+'🤍'.repeat(3-filled);
-    }
-    function renderProgress(){
-      const {done,total,pct}=computeProgress(state.currentDate);
-      $('progressText').textContent=`${done}/${total} (${pct}%)`;
-      $('progressHearts').textContent=renderHearts(pct);
-    }
-
-    /* ==== Registrering + 14d ==== */
-    const dateInput=$('dateInput'), btnPrev=$('btnPrev'), btnNext=$('btnNext'), todaySummary=$('todaySummary'), miniCards=$('miniCards'), history14=$('history14');
-    function segToggle(val,onChange){const el=document.createElement('div'); el.style.display='inline-flex'; el.style.gap='6px'; const off=document.createElement('button');const on=document.createElement('button');off.className='btn';on.className='btn';off.textContent='Av';on.textContent='På'; const set=v=>{on.style.background=v?'#5aa7ff':'';on.style.color=v?'#fff':'';off.style.background=v?'':'#5aa7ff33'; onChange(v)}; set(!!val); off.onclick=()=>set(false); on.onclick=()=>set(true); el.append(off,on); return el;}
-    function clampIfKnown(id,val){ if(id==='sleep_score'){ if(val==null) return val; return Math.max(0,Math.min(100,val)); } if(id==='sleep_hours'){ if(val==null) return val; return Math.max(0,Math.min(12,val)); } return val; }
-    function renderToday(){
-      dateInput.value=state.currentDate; todaySummary.innerHTML='';
-      const date=state.currentDate, values=getEntry(date);
-      state.fields.forEach(f=>{
-        const row=document.createElement('div'); row.className='item';
-        let ctrl; const val=values[f.id];
-        if(f.type==='number'){
-          ctrl=document.createElement('input'); ctrl.className='input'; ctrl.type='number'; ctrl.inputMode='decimal'; ctrl.step='any'; ctrl.style.width='140px'; ctrl.value=(val??'');
-          ctrl.oninput=()=>{ const num=ctrl.value===''?null:Number(ctrl.value); const c=clampIfKnown(f.id,num); pushEntry(date,{...getEntry(date),[f.id]:c}); renderProgress(); };
-        }else if(f.type==='boolean'){
-          ctrl=segToggle(!!val, v=>{ pushEntry(date,{...getEntry(date),[f.id]:v}); renderProgress(); });
-        }else{
-          ctrl=document.createElement('textarea'); ctrl.className='input'; ctrl.rows=2; ctrl.placeholder='skriv…'; ctrl.style.minWidth='220px'; ctrl.value=val??'';
-          let t; const commit=()=>{clearTimeout(t); t=setTimeout(()=>{ pushEntry(date,{...getEntry(date),[f.id]:ctrl.value}); renderProgress(); },200)}; ctrl.oninput=commit; ctrl.onchange=commit;
-        }
-        row.appendChild(Object.assign(document.createElement('div'),{style:'flex:1',innerHTML:`<b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål ${f.goal}`:''}</span>`}));
-        const wrap=document.createElement('div'); wrap.appendChild(ctrl); row.appendChild(wrap); todaySummary.appendChild(row);
-      });
-      renderProgress();
-    }
-    function render14(){
-      const dates=lastNDates(14).reverse();
-      miniCards.innerHTML='';
-      state.fields.filter(f=>f.type==='number').forEach(f=>{
-        const vs=dates.map(d=>getEntry(d)[f.id]).filter(v=>typeof v==='number');
-        const avg=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null;
-        const el=document.createElement('div'); el.className='item';
-        el.innerHTML=`<div style="flex:1"><b>${f.name}</b><div class="muted small">14d snitt</div></div><div>${avg!=null?avg.toFixed(1):'–'}${typeof f.goal==='number'?` <span class="small muted">/ ${f.goal}</span>`:''}</div>`;
-        miniCards.appendChild(el);
-      });
-      const sel=state.historyExpanded?dates.slice().reverse():dates.slice(-3).reverse();
-      history14.innerHTML='';
-      sel.forEach(d=>{
-        const vals=getEntry(d);
-        const parts=Object.entries(vals).filter(([_,v])=>v!=null&&v!=='').map(([id,v])=>{
-          const f=state.fields.find(x=>x.id===id); if(!f) return '';
-          if(f.type==='text') return `<b>${f.name}:</b> ${String(v).slice(0,120)}`;
-          if(f.type==='boolean') return `<b>${f.name}:</b> ${v?'På':'Av'}`;
-          return `<b>${f.name}:</b> ${v}`;
-        }).join(' • ');
-        if(!parts) return;
-        const p=computeProgress(d);
-        const row=document.createElement('div'); row.className='item';
-        row.innerHTML=`<div style="flex:1">
-            <b>${new Date(d).toLocaleDateString('no-NO',{weekday:'short',day:'2-digit',month:'short'})}</b>
-            <div class="small muted">${parts}</div>
-          </div>
-          <div class="small" style="text-align:right">
-            <div>${p.done}/${p.total}</div>
-            <div class="hearts">${renderHearts(p.pct)}</div>
-            <button class="btn small" data-open="${d}" style="margin-top:6px">Åpne</button>
-          </div>`;
-        row.querySelector('[data-open]').onclick=()=>{ state.currentDate=d; renderToday(); window.scrollTo({top:0,behavior:'smooth'}); };
-        history14.appendChild(row);
-      });
-    }
-
-    /* ==== Feltliste / quick-add ==== */
-    function renderFieldList(){
-      const box=$('fieldsList'); box.innerHTML='';
-      state.fields.forEach(f=>{
-        const w=document.createElement('div'); w.className='item';
-        w.innerHTML=`<div style="flex:1"><b>${f.name}</b> <span class="muted small">• ${f.type}${typeof f.goal==='number'?` • mål: ${f.goal}`:''}${f.includeInProgress?` • i fremdrift`:''}</span></div>
-          <div class="row"><button class="btn small" data-del>Fjern</button></div>`;
-        w.querySelector('[data-del]').onclick=()=>markFieldDeleted(f.id);
-        box.appendChild(w);
-      });
-    }
-    function bindQuickAdd(){
-      const map={
-        sleep_score:{id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left'},
-        sleep_hours:{id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,axisHint:'right'},
-        workout_min:{id:'workout_min',name:'Trening (min)',type:'number',goal:30,includeInProgress:true,axisHint:'right'},
-        read_min:{id:'read_min',name:'Lese (min)',type:'number',goal:20,includeInProgress:false,axisHint:'right'},
-        gratitude:{id:'gratitude',name:'Takknemlighet',type:'text',includeInProgress:false}
-      };
-      document.querySelectorAll('#quickAdd .chip').forEach(c=>{
-        c.onclick=async()=>{
-          const key=c.getAttribute('data-quick'); const t=map[key]; if(!t) return;
-          if(state.fields.some(f=>f.id===t.id)){ alert('Finnes allerede'); return; }
-          await pushField({...t,updatedAt:Date.now()}); renderAll();
-        };
-      });
-    }
-
-    /* ==== CRUD (FIKS: optimistisk oppdatering) ==== */
     async function pushField(f){
-      const val={...f,updatedAt:f.updatedAt||Date.now()};
-      // Optimistisk: oppdater state før skriveoperasjoner
-      const idx=state.fields.findIndex(x=>x.id===val.id);
-      if(idx>=0) state.fields[idx]=val; else state.fields.push(val);
-      await idbSet('fields',val);
-      renderFieldList(); // rask visning før snapshot returnerer
+      await idbSet('fields', f);
       if(fb.enabled && state.uid){
-        const u=fb.db.collection('users').doc(state.uid);
-        await u.collection('fields').doc(val.id).set(val,{merge:true});
-        await u.collection('tombstones').doc(`field_${val.id}`).delete().catch(()=>{});
-        await idbDelete('tombstones',`field:${val.id}`);
+        await fb.db.collection('users').doc(state.uid).collection('fields').doc(f.id)
+          .set({...f,updatedAt:Date.now()},{merge:true});
       }
     }
-    async function pushEntry(date,values){
-      if(isEmptyEntry(values)){
-        await markEntryDeleted(date); renderAll(); return;
-      }
-      // Optimistisk: oppdater state før skriveoperasjoner
-      state.entries[date]=values;
-      const val={date,values,updatedAt:Date.now()};
-      await idbSet('entries',val);
+    async function pushEntry(date, values){
+      await idbSet('entries',{date,values,updatedAt:Date.now()});
       if(fb.enabled && state.uid){
-        const u=fb.db.collection('users').doc(state.uid);
-        await u.collection('entries').doc(date).set(val,{merge:true});
-        await u.collection('tombstones').doc(`entry_${date}`).delete().catch(()=>{});
+        await fb.db.collection('users').doc(state.uid).collection('entries').doc(date)
+          .set({date,values,updatedAt:Date.now()},{merge:true});
       }
     }
 
-    /* ==== Binding + Boot ==== */
-    function renderAll(){ renderToday(); render14(); renderChart(); renderFieldList(); }
-    function bindUI(){
-      $('btnLogin').addEventListener('click',signIn);
-      $('btnLogout').onclick=signOut;
-      $('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download="livstracker-export.json";a.click();URL.revokeObjectURL(url)};
-      $('btnImport').onclick=()=>$('fileInput').click();
-      $('fileInput').onchange=e=>{const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{const data=JSON.parse(t); state.fields=data.fields||[]; state.entries=data.entries||{}; renderAll();});};
-      $('btnAddField').onclick=async()=>{
-        const f={id:uid(),name:$('f_name').value.trim()||'Uten navn',type:$('f_type').value,includeInProgress:$('f_include').checked};
-        const g=$('f_goal').value; if(f.type==='number'&&g!=='') f.goal=Number(g);
-        await pushField(f); $('f_name').value='';$('f_goal').value='';$('f_include').checked=false; renderAll();
-      };
-      bindQuickAdd();
-      $('btnToggleHistory').onclick=()=>{state.historyExpanded=!state.historyExpanded; render14();};
-      $('period').onchange=renderChart; $('axisMap').onchange=e=>{state.axisMapMode=e.target.value; renderChart();}; $('showGoals').onchange=renderChart;
-      const upd=()=>{const on=navigator.onLine; $('net').textContent=on?'Online':'Offline'; $('net').className='small '+(on?'':'muted')}; upd(); addEventListener('online',upd); addEventListener('offline',upd);
-      $('dateInput').onchange=()=>{state.currentDate=$('dateInput').value; renderToday(); render14(); renderChart();};
-      $('btnPrev').onclick=()=>{state.currentDate=iso(addDays(state.currentDate,-1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
-      $('btnNext').onclick=()=>{state.currentDate=iso(addDays(state.currentDate, 1)); $('dateInput').value=state.currentDate; renderToday(); render14(); renderChart();}
+    // ===================== Import / Export =====================
+    function exportJSON(){
+      const blob=new Blob([JSON.stringify({fields:state.fields,entries:state.entries},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='livstracker-export.json'; a.click();
+      URL.revokeObjectURL(url);
     }
+    async function importJSON(file){
+      const text=await file.text();
+      const data=JSON.parse(text);
 
-    window.addEventListener('load', async ()=>{
-      await idbOpen();
-      const fs=await idbGetAll('fields'); state.fields=[...new Map(fs.map(f=>[f.id,f])).values()];
-      const es=await idbGetAll('entries'); state.entries=Object.fromEntries(es.map(x=>[x.date,x.values]));
-      bindUI(); state.currentDate=todayISO();
+      const m=byId(state.fields);
+      (data.fields||[]).forEach(f=>m.set(f.id,{...f,updatedAt:Date.now()}));
+      state.fields=[...m.values()];
 
-      // Defaults hvis tomt (søvnscore + søvntimer)
-      if(!state.fields.length){
-        await pushField({id:'sleep_score',name:'Søvnscore %',type:'number',goal:80,includeInProgress:true,axisHint:'left',updatedAt:Date.now()});
-        await pushField({id:'sleep_hours',name:'Søvn (timer)',type:'number',goal:8,includeInProgress:true,axisHint:'right',updatedAt:Date.now()});
-      }
+      for(const f of state.fields) await pushField(f);
+      for(const [d,vals] of Object.entries(data.entries||{})) await pushEntry(d, vals);
 
       renderAll();
-      $('sdkChip').title='Hvis login ikke fester: sjekk Authorized domains (localhost/127.0.0.1/LAN/Vercel) og cookies';
-      try{ await ensureFirebaseReady(); }catch(e){ showBar('Init-feil: '+(e?.message||e)); }
+      alert("Import fullført");
+    }
+
+    // ===================== Progress (hearts) =====================
+    function isDone(field, value){
+      if(field.type==='checkbox') return value===true;
+      if(field.type==='number'){
+        if(value===null || typeof value==='undefined' || value==='') return false;
+        const n=Number(value);
+        if(Number.isNaN(n)) return false;
+        if(typeof field.goal==='number') return n>=field.goal;
+        return true;
+      }
+      return false;
+    }
+
+    function renderProgress(){
+      const fields=state.fields.filter(f=>f.includeInProgress!==false);
+      const values=state.entries[state.selectedDate]||{};
+      const total=fields.length;
+      const done=fields.filter(f=>isDone(f, values[f.id])).length;
+      const pct= total ? Math.round((done/total)*100) : 0;
+
+      document.getElementById('progressText').textContent = `${done}/${total} (${pct}%)`;
+
+      const heartsEl=document.getElementById('hearts');
+      const filled = total ? clamp(Math.round((done/total)*3),0,3) : 0;
+      heartsEl.innerHTML = '';
+      for(let i=0;i<3;i++){
+        const s=document.createElement('span');
+        s.textContent='♥';
+        if(i>=filled) s.className='heartOff';
+        heartsEl.appendChild(s);
+      }
+    }
+
+    // ===================== Day UI =====================
+    function getEntry(date){
+      return state.entries[date] || {};
+    }
+
+    async function setEntryValue(date, fieldId, value){
+      const cur={...getEntry(date)};
+      cur[fieldId]=value;
+      state.entries={...state.entries, [date]:cur};
+      await pushEntry(date, cur);
+      renderAll();
+    }
+
+    function renderDay(){
+      document.getElementById('datePick').value = state.selectedDate;
+      const container=document.getElementById('dayFields');
+      container.innerHTML='';
+
+      const values=getEntry(state.selectedDate);
+
+      state.fields.forEach(f=>{
+        const row=document.createElement('div');
+        row.className='fieldRow';
+
+        const left=document.createElement('div');
+        left.className='fieldLeft';
+        left.innerHTML = `
+          <div class="fieldName">${f.name}</div>
+          <div class="small muted">${f.type}${typeof f.goal==='number' ? ` · mål ${f.goal}`:''}</div>
+        `;
+
+        const right=document.createElement('div');
+
+        if(f.type==='checkbox'){
+          const inp=document.createElement('input');
+          inp.type='checkbox';
+          inp.checked = values[f.id]===true;
+          inp.onchange=()=>setEntryValue(state.selectedDate, f.id, inp.checked);
+          right.appendChild(inp);
+        }else{
+          const inp=document.createElement('input');
+          inp.type='number';
+          inp.className='input';
+          inp.style.width='140px';
+          inp.value = (typeof values[f.id]==='number' || typeof values[f.id]==='string') ? values[f.id] : '';
+          inp.onchange=()=>{
+            const v = inp.value==='' ? null : Number(inp.value);
+            setEntryValue(state.selectedDate, f.id, v);
+          };
+          right.appendChild(inp);
+        }
+
+        row.appendChild(left);
+        row.appendChild(right);
+        container.appendChild(row);
+      });
+
+      renderProgress();
+    }
+
+    async function addFieldFlow(){
+      const name = prompt("Navn på felt (f.eks. Trening, Lesing, Vekt):");
+      if(!name) return;
+
+      const type = (prompt("Type: skriv number eller checkbox", "checkbox")||"").trim().toLowerCase();
+      if(type!=='number' && type!=='checkbox') return alert("Ugyldig type. Bruk number eller checkbox.");
+
+      let goal = null;
+      if(type==='number'){
+        const g = prompt("Mål (valgfritt). Tom = ingen mål:", "");
+        goal = (g===null || g.trim()==='') ? null : Number(g);
+        if(goal!==null && Number.isNaN(goal)) return alert("Mål må være et tall.");
+      }
+
+      const id = normId(name);
+      const exists = state.fields.some(f=>f.id===id);
+      const finalId = exists ? (id+'_'+Math.random().toString(16).slice(2,6)) : id;
+
+      const field = {
+        id: finalId,
+        name,
+        type,
+        goal: (type==='number' && typeof goal==='number') ? goal : undefined,
+        includeInProgress: true,
+        axisHint: (type==='number' ? 'right' : undefined),
+        updatedAt: Date.now()
+      };
+
+      await pushField(field);
+      state.fields=[...byId([...state.fields, field]).values()];
+      renderAll();
+    }
+
+    // ===================== Chart =====================
+    let chart;
+
+    function pickAxis(field){
+      if(state.axisMapMode==='manual' && field.axisHint){
+        return field.axisHint==='left' ? 'y' : 'y1';
+      }
+      const n=(field.name||'').toLowerCase();
+      if(n.includes('score') || n.includes('%')) return 'y';
+      if(n.includes('timer') || n.includes('time') || n.includes('min')) return 'y1';
+      if(typeof field.goal==='number' && field.goal>12) return 'y';
+      return 'y1';
+    }
+
+    function periodSince(){
+      const p=periodEl.value;
+      if(p==='all') return null;
+      return addDays(new Date(), -Number(p));
+    }
+
+    function buildDatasets(labels, fields, matrix, showGoals){
+      const colors=['#5aa7ff','#7dd3fc','#a78bfa','#f472b6','#fca5a5','#f59e0b','#34d399','#4ade80','#22d3ee','#60a5fa','#93c5fd'];
+      const ds=[];
+      fields.forEach((f,idx)=>{
+        const axis=pickAxis(f);
+        const data=labels.map(d=> (matrix[d] && matrix[d][f.id]!==undefined) ? Number(matrix[d][f.id]) : null);
+
+        ds.push({
+          label:f.name,
+          data,
+          yAxisID:axis,
+          borderColor:colors[idx%colors.length],
+          backgroundColor:colors[idx%colors.length]+'33',
+          pointRadius:0,
+          tension:.25
+        });
+
+        if(showGoals && typeof f.goal==='number'){
+          ds.push({
+            label:f.name+' mål',
+            data:labels.map(()=>f.goal),
+            yAxisID:axis,
+            borderColor:colors[idx%colors.length],
+            borderDash:[6,6],
+            pointRadius:0,
+            tension:0
+          });
+        }
+      });
+      return ds;
+    }
+
+    function renderChart(){
+      const since=periodSince();
+      const datesAll=Object.keys(state.entries).sort();
+      const dates=datesAll.filter(d=>!since || new Date(d)>=since);
+
+      const labels=dates; // dag for dag
+      const matrix={};
+      for(const d of labels) matrix[d]=state.entries[d]||{};
+
+      const selected = state.selectedFields.length ? new Set(state.selectedFields) : new Set(state.fields.map(f=>f.id));
+      const fields = state.fields.filter(f=>selected.has(f.id) && f.type==='number');
+
+      const datasets=buildDatasets(labels, fields, matrix, showGoalsEl.checked);
+
+      if(chart) chart.destroy();
+      chart=new Chart(chartCtx,{
+        type:'line',
+        data:{labels,datasets},
+        options:{
+          responsive:true,
+          animation:false,
+          interaction:{mode:'nearest',intersect:false},
+          plugins:{legend:{display:true,position:'bottom'}},
+          scales:{
+            y:{type:'linear',position:'left',min:0,max:100,grid:{color:'#1e2633'},ticks:{color:'#9aa4af'}},
+            y1:{type:'linear',position:'right',min:0,max:12,grid:{drawOnChartArea:false},ticks:{color:'#9aa4af'}},
+            x:{grid:{color:'#1e2633'},ticks:{color:'#9aa4af'}}
+          }
+        }
+      });
+
+      legendEl.innerHTML='';
+      fields.forEach(f=>{
+        const chip=document.createElement('div');
+        chip.className='chip';
+        chip.textContent=f.name;
+        chip.onclick=()=>{
+          const i=chart.data.datasets.findIndex(d=>d.label===f.name);
+          const gi=chart.data.datasets.findIndex(d=>d.label===f.name+' mål');
+          if(i>=0) chart.toggleDataVisibility(i);
+          if(gi>=0) chart.toggleDataVisibility(gi);
+          chart.update();
+          chip.classList.toggle('off');
+        };
+        legendEl.appendChild(chip);
+      });
+    }
+
+    // ===================== Field select =====================
+    function renderFieldSelect(){
+      fieldSelect.innerHTML='';
+      const nums = state.fields.filter(f=>f.type==='number');
+      nums.forEach(f=>{
+        const opt=document.createElement('option');
+        opt.value=f.id;
+        opt.textContent=f.name;
+        fieldSelect.appendChild(opt);
+      });
+      for(const id of state.selectedFields){
+        const o=[...fieldSelect.options].find(o=>o.value===id);
+        if(o) o.selected=true;
+      }
+      fieldSelect.onchange=()=>{
+        state.selectedFields=[...fieldSelect.selectedOptions].map(o=>o.value);
+        renderChart();
+      };
+    }
+
+    function renderAll(){
+      renderFieldSelect();
+      renderDay();
+      renderChart();
+    }
+
+    // ===================== Defaults =====================
+    async function ensureDefaults(){
+      if(state.fields.length) return;
+
+      const defaults=[
+        {id:'sleep_hours', name:'Søvn (timer)', type:'number', goal:8, includeInProgress:true, axisHint:'right', updatedAt:Date.now()},
+        {id:'sleep_score', name:'Søvnscore %', type:'number', goal:80, includeInProgress:true, axisHint:'left', updatedAt:Date.now()},
+        {id:'training', name:'Trening', type:'checkbox', includeInProgress:true, updatedAt:Date.now()},
+        {id:'reading', name:'Lesing', type:'checkbox', includeInProgress:true, updatedAt:Date.now()}
+      ];
+      for(const f of defaults) await pushField(f);
+      state.fields = defaults;
+    }
+
+    // ===================== UI binding =====================
+    const syncStatus=document.getElementById('syncStatus');
+    const netEl=document.getElementById('net');
+    const periodEl=document.getElementById('period');
+    const axisEl=document.getElementById('axisMap');
+    const showGoalsEl=document.getElementById('showGoals');
+    const fieldSelect=document.getElementById('fieldSelect');
+    const chartCtx=document.getElementById('chart').getContext('2d');
+    const legendEl=document.getElementById('legend');
+
+    function bindUI(){
+      document.getElementById('btnExport').onclick=exportJSON;
+      document.getElementById('btnImport').onclick=()=>document.getElementById('fileInput').click();
+      document.getElementById('fileInput').onchange=(e)=>{const f=e.target.files?.[0]; if(f) importJSON(f);};
+
+      document.getElementById('btnLogin').onclick=signIn;
+      document.getElementById('btnLogout').onclick=signOut;
+
+      document.getElementById('datePick').onchange=(e)=>{ state.selectedDate=e.target.value; renderAll(); };
+      document.getElementById('prevDay').onclick=()=>{ state.selectedDate=iso(addDays(state.selectedDate,-1)); renderAll(); };
+      document.getElementById('nextDay').onclick=()=>{ state.selectedDate=iso(addDays(state.selectedDate, 1)); renderAll(); };
+
+      document.getElementById('btnAddField').onclick=addFieldFlow;
+
+      periodEl.onchange=renderChart;
+      axisEl.onchange=(e)=>{ state.axisMapMode=e.target.value; renderChart(); };
+      showGoalsEl.onchange=renderChart;
+
+      const upd=()=>{ netEl.textContent=navigator.onLine?'Online':'Offline'; netEl.className='small '+(navigator.onLine?'':'muted'); };
+      window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
+    }
+
+    // ===================== Boot =====================
+    async function boot(){
+      await idbOpen();
+
+      // load local
+      const fieldsArr=await idbGetAll('fields');
+      state.fields=[...byId(fieldsArr).values()];
+
+      const entriesArr=await idbGetAll('entries');
+      state.entries=Object.fromEntries(entriesArr.map(x=>[x.date,x.values]));
+
+      state.selectedDate = todayISO();
+
+      await tryInitFirebase();
+      bindUI();
+
+      if(fb.enabled){
+        fb.auth.onAuthStateChanged(async (user)=>{
+          if(user){
+            clearBanner();
+            state.uid=user.uid;
+            syncStatus.textContent='Pålogget';
+            document.getElementById('btnLogout').style.display='inline-block';
+            document.getElementById('btnLogin').style.display='none';
+            await startSync(user.uid);
+          }else{
+            state.uid=null;
+            syncStatus.textContent='Ikke pålogget';
+            document.getElementById('btnLogout').style.display='none';
+            document.getElementById('btnLogin').style.display='inline-block';
+
+            // Hvis du nettopp logget inn men får null her, er det nesten alltid cookies/domains
+            // (banner er nyttig men ikke spammer)
+          }
+        });
+      }else{
+        syncStatus.textContent='Kun lokal lagring';
+      }
+
+      await ensureDefaults();
+      renderAll();
+    }
+
+    window.addEventListener('load', () => {
+      boot().catch(err=>{
+        console.error(err);
+        showBanner("Boot-feil: " + (err?.message || err));
+      });
     });
 
-    /* Firestore Rules (referanse)
+    /* Firestore Rules (publiser disse):
     rules_version = '2';
     service cloud.firestore {
       match /databases/{db}/documents {
@@ -568,7 +711,8 @@
           allow read, write: if request.auth != null && request.auth.uid == uid;
         }
       }
-    } */
+    }
+    */
   </script>
 </body>
 </html>
